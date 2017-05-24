@@ -8,12 +8,6 @@ import cv2, copy, textwrap
 from PIL import Image, ImageFont, ImageDraw
 from PIL.ExifTags import TAGS
 
-available_font = "arial.ttf"
-try:
-    dummy = ImageFont.truetype(available_font, 16)
-except:
-    available_font = "FreeMono.ttf"
-
 ####################################
 # Visualize results
 ####################################
@@ -73,11 +67,12 @@ def visualizeResultsFaster(imgPath, roiLabels, roiScores, roiRelCoords, padWidth
                 drawRectangles(imgDebug, [rect], color=color, thickness=thickness)
             elif iter == 2 and label > 0:
                 if not nmsKeepIndices or (roiIndex in nmsKeepIndices):
-                    font = ImageFont.truetype("arial.ttf", 18)
+                    #font = ImageFont.truetype("arial.ttf", 18)
                     text = classes[label]
                     if roiScores:
                         text += "(" + str(round(score, 2)) + ")"
-                    imgDebug = drawText(imgDebug, (rect[0],rect[1]), text, color = (255,255,255), font = font, colorBackground=color)
+                    #imgDebug = drawText(imgDebug, (rect[0],rect[1]), text, color = (255,255,255), font = font, colorBackground=color)
+                    #imgDebug = drawText(imgDebug, (rect[0], rect[1]), text, color=(255, 255, 255), colorBackground=color)
     return imgDebug
 
 
@@ -219,25 +214,25 @@ def ptClip(pt, maxWidth, maxHeight):
     pt[1] = min(pt[1], maxHeight)
     return pt
 
-def drawText(img, pt, text, textWidth=None, color = (255,255,255), colorBackground = None, font = ImageFont.truetype("arial.ttf", 16)):
-    pilImg = imconvertCv2Pil(img)
-    pilImg = pilDrawText(pilImg,  pt, text, textWidth, color, colorBackground, font)
-    return imconvertPil2Cv(pilImg)
+#def drawText(img, pt, text, textWidth=None, color = (255,255,255), colorBackground = None, font = ImageFont.truetype("arial.ttf", 16)):
+#    pilImg = imconvertCv2Pil(img)
+#    pilImg = pilDrawText(pilImg,  pt, text, textWidth, color, colorBackground, font)
+#    return imconvertPil2Cv(pilImg)
 
-def pilDrawText(pilImg, pt, text, textWidth=None, color = (255,255,255), colorBackground = None, font = ImageFont.truetype("arial.ttf", 16)):
-    textY = pt[1]
-    draw = ImageDraw.Draw(pilImg)
-    if textWidth == None:
-        lines = [text]
-    else:
-        lines = textwrap.wrap(text, width=textWidth)
-    for line in lines:
-        width, height = font.getsize(line)
-        if colorBackground != None:
-            draw.rectangle((pt[0], pt[1], pt[0] + width, pt[1] + height), fill=tuple(colorBackground[::-1]))
-        draw.text(pt, line, fill = tuple(color), font = font)
-        textY += height
-    return pilImg
+#def pilDrawText(pilImg, pt, text, textWidth=None, color = (255,255,255), colorBackground = None, font = ImageFont.truetype("arial.ttf", 16)):
+#    textY = pt[1]
+#    draw = ImageDraw.Draw(pilImg)
+#    if textWidth == None:
+#        lines = [text]
+#    else:
+#        lines = textwrap.wrap(text, width=textWidth)
+#    for line in lines:
+#        width, height = font.getsize(line)
+#        if colorBackground != None:
+#            draw.rectangle((pt[0], pt[1], pt[0] + width, pt[1] + height), fill=tuple(colorBackground[::-1]))
+#        draw.text(pt, line, fill = tuple(color), font = font)
+#        textY += height
+#    return pilImg
 
 def getColorsPalette():
     colors = [[255,0,0], [0,255,0], [0,0,255], [255,255,0], [255,0,255]]

@@ -41,9 +41,9 @@ __C.CNTK.INVESTIGATE_FREE_DIMENSION = False
 
 __C.CNTK.TRAIN_E2E = False
 __C.CNTK.MAKE_MODE = False
-__C.CNTK.DEBUG_OUTPUT = True
+__C.CNTK.DEBUG_OUTPUT = False
 
-__C.CNTK.DATASET = "Grocery" # "Grocery" or "Pascal"
+__C.CNTK.DATASET = "Pascal" # "Grocery" or "Pascal"
 __C.CNTK.BASE_MODEL = "AlexNet" # "VGG16" or "AlexNet"
 __C.CNTK.MAX_EPOCHS_E2E = 20
 __C.CNTK.INPUT_ROIS_PER_IMAGE = 50

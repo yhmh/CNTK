@@ -37,6 +37,13 @@ except ImportError:
     pip.main(['install', '--user', 'pyyaml'])
     import yaml
 
+try:
+    import easydict
+except ImportError:
+    import pip
+    pip.main(['install', '--user', 'easydict'])
+    import yaml
+
 abs_path = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(abs_path, ".."))
 from utils.rpn.rpn_helpers import create_rpn, create_proposal_target_layer
@@ -44,12 +51,6 @@ from utils.rpn.cntk_smoothL1_loss import SmoothL1Loss
 from utils.rpn.bbox_transform import bbox_transform_inv
 from config import cfg
 from cntk_helpers import visualizeResultsFaster
-
-available_font = "arial.ttf"
-try:
-    dummy = ImageFont.truetype(available_font, 16)
-except:
-    available_font = "FreeMono.ttf"
 
 ###############################################################
 ###############################################################
@@ -139,7 +140,7 @@ def get_4stage_learning_parameters():
         lrp['rpn_lr_per_sample'] = [0.001] * 12 + [0.0001] * 4
     else:
         if dataset == "Pascal":
-            lrp['rpn_epochs'] = 2 #16
+            lrp['rpn_epochs'] = 16
             lrp['rpn_lr_per_sample'] = [0.001] * 12 + [0.0001] * 4
         else:
             lrp['rpn_epochs'] = 1 if fastmode else 16
@@ -365,7 +366,7 @@ def train_model(image_input, roi_input, loss, pred_error,
     # Get minibatches of images and perform model training
     print("Training model for %s epochs." % epochs_to_train)
     log_number_of_parameters(loss)
-    progress_printer = ProgressPrinter(tag='Training', num_epochs=epochs_to_train)
+    progress_printer = ProgressPrinter(tag='Training', num_epochs=epochs_to_train, gen_heartbeat=True)
     for epoch in range(epochs_to_train):       # loop over epochs
         sample_count = 0
         while sample_count < epoch_size:  # loop over minibatches in the epoch
@@ -765,13 +766,14 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
 # The main method trains and evaluates a Fast R-CNN model.
 # If a trained model is already available it is loaded an no training will be performed.
 if __name__ == '__main__':
-    os.chdir(base_path)
-    if not os.path.exists(os.path.join(abs_path, "Output")):
-        os.makedirs(os.path.join(abs_path, "Output"))
-    if not os.path.exists(os.path.join(abs_path, "Output", "Grocery")):
-        os.makedirs(os.path.join(abs_path, "Output", "Grocery"))
-    if not os.path.exists(os.path.join(abs_path, "Output", "Pascal")):
-        os.makedirs(os.path.join(abs_path, "Output", "Pascal"))
+    if os.path.exists(base_path):
+        os.chdir(base_path)
+        if not os.path.exists(os.path.join(abs_path, "Output")):
+            os.makedirs(os.path.join(abs_path, "Output"))
+        if not os.path.exists(os.path.join(abs_path, "Output", "Grocery")):
+            os.makedirs(os.path.join(abs_path, "Output", "Grocery"))
+        if not os.path.exists(os.path.join(abs_path, "Output", "Pascal")):
+            os.makedirs(os.path.join(abs_path, "Output", "Pascal"))
 
     #import pdb; pdb.set_trace()
     #caffe_model = r"C:\Temp\Yuxiao_20170428_converted_models\VGG16_faster_rcnn_final.cntkmodel"
