@@ -44,7 +44,6 @@ from utils.rpn.cntk_smoothL1_loss import SmoothL1Loss
 from utils.rpn.bbox_transform import bbox_transform_inv
 from config import cfg
 from cntk_helpers import visualizeResultsFaster
-#from utils.rpn.cntk_debug import DebugLayer
 
 available_font = "arial.ttf"
 try:
@@ -54,7 +53,7 @@ except:
 
 ###############################################################
 ###############################################################
-fastmode = True
+fastmode = cfg["CNTK"].FAST_MODE
 graph_type = "png" # "png" or "pdf"
 
 # stream names and paths
@@ -539,10 +538,12 @@ def train_faster_rcnn_alternating(debug_output=False):
         rois, label_targets, bbox_targets, bbox_inside_weights = \
             create_proposal_target_layer(rpn_rois, scaled_gt_boxes, num_classes=num_classes)
 
-        #rois = user_function(DebugLayer(rois, debug_name="debug_ptl_rois"))
-        #label_targets = user_function(DebugLayer(label_targets, debug_name="debug_ptl_label_targets"))
-        #bbox_targets = user_function(DebugLayer(bbox_targets, debug_name="debug_ptl_bbox_targets"))
-        #bbox_inside_weights = user_function(DebugLayer(bbox_inside_weights, debug_name="debug_ptl_bbiw"))
+        if cfg["CNTK"].INVESTIGATE_FREE_DIMENSION:
+            from utils.rpn.cntk_debug import DebugLayer
+            rois = user_function(DebugLayer(rois, debug_name="debug_ptl_rois"))
+            label_targets = user_function(DebugLayer(label_targets, debug_name="debug_ptl_label_targets"))
+            bbox_targets = user_function(DebugLayer(bbox_targets, debug_name="debug_ptl_bbox_targets"))
+            bbox_inside_weights = user_function(DebugLayer(bbox_inside_weights, debug_name="debug_ptl_bbiw"))
 
         # Fast RCNN
         fc_layers = clone_model(base_model, [pool_node_name], [last_hidden_node_name], CloneMethod.clone)

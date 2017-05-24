@@ -15,6 +15,10 @@ from utils.rpn.cntk_ignore_label import IgnoreLabel
 from utils.rpn.proposal_layer import ProposalLayer
 from utils.rpn.proposal_target_layer import ProposalTargetLayer
 from utils.rpn.cntk_smoothL1_loss import SmoothL1Loss
+try:
+    from config import cfg
+except ImportError:
+    from utils.default_config import cfg
 
 def create_rpn(conv_out, scaled_gt_boxes, im_info, add_loss_functions=True,
                proposal_layer_param_string=None):
@@ -55,7 +59,10 @@ def create_rpn(conv_out, scaled_gt_boxes, im_info, add_loss_functions=True,
 
     # proposal layer
     rpn_rois_raw = user_function(ProposalLayer(rpn_cls_prob_reshape, rpn_bbox_pred, im_info, param_str=proposal_layer_param_string))
-    rpn_rois = alias(rpn_rois_raw, name='rpn_rois')
+    if cfg["CNTK"].INVESTIGATE_ALIAS_BUG:
+        rpn_rois = rpn_rois_raw
+    else:
+        rpn_rois = alias(rpn_rois_raw, name='rpn_rois')
 
     rpn_losses = None
     if(add_loss_functions):
@@ -107,9 +114,15 @@ def create_proposal_target_layer(rpn_rois, scaled_gt_boxes, num_classes):
     ptl_param_string = "'num_classes': {}".format(num_classes)
     ptl = user_function(ProposalTargetLayer(rpn_rois, scaled_gt_boxes, param_str=ptl_param_string))
     rois = alias(ptl.outputs[0], name='rpn_target_rois')
-    label_targets = alias(ptl.outputs[1], name='label_targets')
-    bbox_targets = alias(ptl.outputs[2], name='bbox_targets')
-    bbox_inside_weights = alias(ptl.outputs[3], name='bbox_inside_w')
+
+    if cfg["CNTK"].INVESTIGATE_FREE_DIMENSION:
+        label_targets = alias(ptl.outputs[1] * 1.0, name='label_targets')
+        bbox_targets = alias(ptl.outputs[2] * 1.0, name='bbox_targets')
+        bbox_inside_weights = alias(ptl.outputs[3] * 1.0, name='bbox_inside_w')
+    else:
+        label_targets = alias(ptl.outputs[1], name='label_targets')
+        bbox_targets = alias(ptl.outputs[2], name='bbox_targets')
+        bbox_inside_weights = alias(ptl.outputs[3], name='bbox_inside_w')
 
     return rois, label_targets, bbox_targets, bbox_inside_weights
 

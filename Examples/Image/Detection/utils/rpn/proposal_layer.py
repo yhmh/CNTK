@@ -49,9 +49,14 @@ class ProposalLayer(UserFunction):
 
         # cfg_key = str(self.phase) # either 'TRAIN' or 'TEST' --> use FreeDimension and set output size in fwd
         proposalShape = (cfg["TRAIN"].RPN_POST_NMS_TOP_N, 4)
-        #proposalShape = (FreeDimension, 4)
+        if cfg["CNTK"].INVESTIGATE_FREE_DIMENSION:
+            proposalShape = (FreeDimension, 4)
 
-        return [output_variable(proposalShape, self.inputs[0].dtype, self.inputs[0].dynamic_axes,
+        if cfg["CNTK"].INVESTIGATE_ALIAS_BUG:
+            return [output_variable(proposalShape, self.inputs[0].dtype, self.inputs[0].dynamic_axes,
+                                name="rpn_rois", needs_gradient=False)] # , name="rpn_rois" | name="rpn_rois_raw"
+        else:
+            return [output_variable(proposalShape, self.inputs[0].dtype, self.inputs[0].dynamic_axes,
                                 name="rpn_rois_raw", needs_gradient=False)] # , name="rpn_rois" | name="rpn_rois_raw"
 
     def forward(self, arguments, device=None, outputs_to_retain=None):

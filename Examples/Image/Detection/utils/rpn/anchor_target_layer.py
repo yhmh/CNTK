@@ -58,7 +58,12 @@ class AnchorTargetLayer(UserFunction):
         self._allowed_border = False # layer_params.get('allowed_border', 0)
 
     def infer_outputs(self):
-        height, width = self.inputs[0].shape[-2:]
+        if cfg["CNTK"].INVESTIGATE_CLONE_BUG:
+            height, width = self.inputs[0].shape[-2:]
+        else:
+            height = 61
+            width = 61
+
         if DEBUG:
             print('AnchorTargetLayer: height', height, 'width', width)
 
