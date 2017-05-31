@@ -6,7 +6,7 @@
 
 import numpy as np
 import cntk as C
-from cntk import user_function, relu, softmax, reduce_sum, slice, splice, reshape, element_times, plus, alias
+from cntk import user_function, relu, softmax, reduce_sum as reduce_mean, slice, splice, reshape, element_times, plus, alias
 from cntk.initializer import glorot_uniform, normal
 from cntk.layers import Convolution
 from cntk.losses import cross_entropy_with_softmax
@@ -82,7 +82,7 @@ def create_rpn(conv_out, scaled_gt_boxes, im_info, add_loss_functions=True,
         # RPN losses
         rpn_loss_cls = cross_entropy_with_softmax(rpn_cls_prob_ignore, rpn_labels_ignore, axis=0)
         rpn_loss_bbox = user_function(SmoothL1Loss(rpn_bbox_pred, rpn_bbox_targets, rpn_bbox_inside_weights))
-        rpn_losses = plus(reduce_sum(rpn_loss_cls), reduce_sum(rpn_loss_bbox), name="rpn_losses")
+        rpn_losses = plus(reduce_mean(rpn_loss_cls), reduce_mean(rpn_loss_bbox), name="rpn_losses")
 
     return rpn_rois, rpn_losses
 
