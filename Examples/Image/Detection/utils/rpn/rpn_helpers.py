@@ -59,10 +59,7 @@ def create_rpn(conv_out, scaled_gt_boxes, im_info, add_loss_functions=True,
 
     # proposal layer
     rpn_rois_raw = user_function(ProposalLayer(rpn_cls_prob_reshape, rpn_bbox_pred, im_info, param_str=proposal_layer_param_string))
-    if cfg["CNTK"].INVESTIGATE_ALIAS_BUG:
-        rpn_rois = rpn_rois_raw
-    else:
-        rpn_rois = alias(rpn_rois_raw, name='rpn_rois')
+    rpn_rois = alias(rpn_rois_raw, name='rpn_rois')
 
     rpn_losses = None
     if(add_loss_functions):

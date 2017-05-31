@@ -7,6 +7,16 @@ from builtins import range
 import cv2, copy, textwrap
 from PIL import Image, ImageFont, ImageDraw
 from PIL.ExifTags import TAGS
+from cntk import input_variable, Axis
+from utils.rpn.bbox_transform import bbox_transform_inv
+from matplotlib.pyplot import imsave
+
+available_font = "arial.ttf"
+try:
+    dummy = ImageFont.truetype(available_font, 16)
+except:
+    available_font = "FreeMono.ttf"
+
 
 ####################################
 # Visualize results
@@ -67,13 +77,96 @@ def visualizeResultsFaster(imgPath, roiLabels, roiScores, roiRelCoords, padWidth
                 drawRectangles(imgDebug, [rect], color=color, thickness=thickness)
             elif iter == 2 and label > 0:
                 if not nmsKeepIndices or (roiIndex in nmsKeepIndices):
-                    #font = ImageFont.truetype("arial.ttf", 18)
+                    font = ImageFont.truetype(available_font, 18)
                     text = classes[label]
                     if roiScores:
                         text += "(" + str(round(score, 2)) + ")"
-                    #imgDebug = drawText(imgDebug, (rect[0],rect[1]), text, color = (255,255,255), font = font, colorBackground=color)
-                    #imgDebug = drawText(imgDebug, (rect[0], rect[1]), text, color=(255, 255, 255), colorBackground=color)
+                    imgDebug = drawText(imgDebug, (rect[0],rect[1]), text, color = (255,255,255), font = font, colorBackground=color)
     return imgDebug
+
+
+def load_resize_and_pad(image_path, width, height, pad_value=114):
+    img = cv2.imread(image_path)
+    img_width = len(img[0])
+    img_height = len(img)
+
+    scale_w = img_width > img_height
+
+    target_w = width
+    target_h = height
+
+    if scale_w:
+        target_h = int(np.round(img_height * float(width) / float(img_width)))
+    else:
+        target_w = int(np.round(img_width * float(height) / float(img_height)))
+
+    resized = cv2.resize(img, (target_w, target_h), 0, 0, interpolation=cv2.INTER_NEAREST)
+
+    top = int(max(0, np.round((height - target_h) / 2)))
+    left = int(max(0, np.round((width - target_w) / 2)))
+
+    bottom = height - top - target_h
+    right = width - left - target_w
+
+    resized_with_pad = cv2.copyMakeBorder(resized, top, bottom, left, right,
+                                          cv2.BORDER_CONSTANT, value=[pad_value, pad_value, pad_value])
+
+    # transpose(2,0,1) converts the image to the HWC format which CNTK accepts
+    model_arg_rep = np.ascontiguousarray(np.array(resized_with_pad, dtype=np.float32).transpose(2, 0, 1))
+
+    return resized_with_pad, model_arg_rep
+
+def regress_rois(roi_proposals, roi_regression_factors, labels):
+    for i in range(len(labels)):
+        label = labels[i]
+        if label > 0:
+            deltas = roi_regression_factors[i:i+1,label*4:(label+1)*4]
+            roi_coords = roi_proposals[i:i+1,:]
+            regressed_rois = bbox_transform_inv(roi_coords, deltas)
+            roi_proposals[i,:] = regressed_rois
+
+    return roi_proposals
+
+# Tests a Faster R-CNN model and plots images with detected boxes
+def eval_and_plot_faster_rcnn(eval_model, num_images_to_plot, test_map_file, img_shape,
+                              results_base_path, feature_node_name, classes, debug_output=False):
+    # get image paths
+    with open(test_map_file) as f:
+        content = f.readlines()
+    img_base_path = os.path.dirname(os.path.abspath(test_map_file))
+    img_file_names = [os.path.join(img_base_path, x.split('\t')[1]) for x in content]
+
+    # prepare model
+    image_input = input_variable(img_shape, dynamic_axes=[Axis.default_batch_axis()], name=feature_node_name)
+    frcn_eval = eval_model(image_input)
+
+    print("Evaluating Faster R-CNN model for %s images." % num_images_to_plot)
+    for i in range(0, num_images_to_plot):
+        imgPath = img_file_names[i]
+
+        # evaluate single image
+        _, cntk_img_input = load_resize_and_pad(imgPath, img_shape[2], img_shape[1])
+        output = frcn_eval.eval({frcn_eval.arguments[0]: [cntk_img_input]})
+
+        out_dict = dict([(k.name, k) for k in output])
+        out_cls_pred = output[out_dict['cls_pred']][0]
+        out_rpn_rois = output[out_dict['rpn_rois']][0]
+        out_bbox_regr = output[out_dict['bbox_regr']][0]
+
+        labels = out_cls_pred.argmax(axis=1)
+        scores = out_cls_pred.max(axis=1).tolist()
+
+        if debug_output:
+            # plot results without final regression
+            imgDebug = visualizeResultsFaster(imgPath, labels, scores, out_rpn_rois, 1000, 1000,
+                                              classes, nmsKeepIndices=None, boDrawNegativeRois=True)
+            imsave("{}/{}_{}".format(results_base_path, i, os.path.basename(imgPath)), imgDebug)
+
+        # apply regression to bbox coordinates
+        regressed_rois = regress_rois(out_rpn_rois, out_bbox_regr, labels)
+        img = visualizeResultsFaster(imgPath, labels, scores, regressed_rois, 1000, 1000,
+                                     classes, nmsKeepIndices=None, boDrawNegativeRois=True)
+        imsave("{}/{}_regr_{}".format(results_base_path, i, os.path.basename(imgPath)), img)
 
 
 ####################################
@@ -214,25 +307,25 @@ def ptClip(pt, maxWidth, maxHeight):
     pt[1] = min(pt[1], maxHeight)
     return pt
 
-#def drawText(img, pt, text, textWidth=None, color = (255,255,255), colorBackground = None, font = ImageFont.truetype("arial.ttf", 16)):
-#    pilImg = imconvertCv2Pil(img)
-#    pilImg = pilDrawText(pilImg,  pt, text, textWidth, color, colorBackground, font)
-#    return imconvertPil2Cv(pilImg)
+def drawText(img, pt, text, textWidth=None, color = (255,255,255), colorBackground = None, font = ImageFont.truetype("arial.ttf", 16)):
+    pilImg = imconvertCv2Pil(img)
+    pilImg = pilDrawText(pilImg,  pt, text, textWidth, color, colorBackground, font)
+    return imconvertPil2Cv(pilImg)
 
-#def pilDrawText(pilImg, pt, text, textWidth=None, color = (255,255,255), colorBackground = None, font = ImageFont.truetype("arial.ttf", 16)):
-#    textY = pt[1]
-#    draw = ImageDraw.Draw(pilImg)
-#    if textWidth == None:
-#        lines = [text]
-#    else:
-#        lines = textwrap.wrap(text, width=textWidth)
-#    for line in lines:
-#        width, height = font.getsize(line)
-#        if colorBackground != None:
-#            draw.rectangle((pt[0], pt[1], pt[0] + width, pt[1] + height), fill=tuple(colorBackground[::-1]))
-#        draw.text(pt, line, fill = tuple(color), font = font)
-#        textY += height
-#    return pilImg
+def pilDrawText(pilImg, pt, text, textWidth=None, color = (255,255,255), colorBackground = None, font = ImageFont.truetype("arial.ttf", 16)):
+    textY = pt[1]
+    draw = ImageDraw.Draw(pilImg)
+    if textWidth == None:
+        lines = [text]
+    else:
+        lines = textwrap.wrap(text, width=textWidth)
+    for line in lines:
+        width, height = font.getsize(line)
+        if colorBackground != None:
+            draw.rectangle((pt[0], pt[1], pt[0] + width, pt[1] + height), fill=tuple(colorBackground[::-1]))
+        draw.text(pt, line, fill = tuple(color), font = font)
+        textY += height
+    return pilImg
 
 def getColorsPalette():
     colors = [[255,0,0], [0,255,0], [0,0,255], [255,255,0], [255,0,255]]

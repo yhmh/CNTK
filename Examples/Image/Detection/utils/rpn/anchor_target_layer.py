@@ -27,7 +27,7 @@ class AnchorTargetLayer(UserFunction):
     labels and bounding-box regression targets.
     '''
 
-    def __init__(self, arg1, arg2, arg3, name='AnchorTargetLayer', param_str=None, deterministic=False):
+    def __init__(self, arg1, arg2, arg3, name='AnchorTargetLayer', param_str=None, cfm_shape=None, deterministic=False):
         super(AnchorTargetLayer, self).__init__([arg1, arg2, arg3], name=name)
         self.param_str_ = param_str if param_str is not None else "'feat_stride': 16\n'scales':\n - 8 \n - 16 \n - 32"
 
@@ -37,6 +37,7 @@ class AnchorTargetLayer(UserFunction):
         self._anchors = generate_anchors(scales=np.array(anchor_scales))
         self._num_anchors = self._anchors.shape[0]
         self._feat_stride = layer_params['feat_stride']
+        self._cfm_shape = cfm_shape
         self._determininistic_mode = deterministic
 
         if DEBUG:
@@ -58,11 +59,10 @@ class AnchorTargetLayer(UserFunction):
         self._allowed_border = False # layer_params.get('allowed_border', 0)
 
     def infer_outputs(self):
-        if cfg["CNTK"].INVESTIGATE_CLONE_BUG:
-            height, width = self.inputs[0].shape[-2:]
-        else:
-            height = 61
-            width = 61
+        # This is a necessary work around since anfter cloning the cloned inputs are just place holders without the proper shape
+        if self._cfm_shape is None:
+            self._cfm_shape = self.inputs[0].shape
+        height, width = self._cfm_shape[-2:]
 
         if DEBUG:
             print('AnchorTargetLayer: height', height, 'width', width)
@@ -255,7 +255,7 @@ class AnchorTargetLayer(UserFunction):
         pass
 
     def clone(self, cloned_inputs):
-        return AnchorTargetLayer(cloned_inputs[0], cloned_inputs[1], cloned_inputs[2], param_str=self.param_str_)
+        return AnchorTargetLayer(cloned_inputs[0], cloned_inputs[1], cloned_inputs[2], param_str=self.param_str_, cfm_shape=self._cfm_shape)
 
     def serialize(self):
         internal_state = {}

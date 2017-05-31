@@ -52,12 +52,8 @@ class ProposalLayer(UserFunction):
         if cfg["CNTK"].INVESTIGATE_FREE_DIMENSION:
             proposalShape = (FreeDimension, 4)
 
-        if cfg["CNTK"].INVESTIGATE_ALIAS_BUG:
-            return [output_variable(proposalShape, self.inputs[0].dtype, self.inputs[0].dynamic_axes,
-                                name="rpn_rois", needs_gradient=False)] # , name="rpn_rois" | name="rpn_rois_raw"
-        else:
-            return [output_variable(proposalShape, self.inputs[0].dtype, self.inputs[0].dynamic_axes,
-                                name="rpn_rois_raw", needs_gradient=False)] # , name="rpn_rois" | name="rpn_rois_raw"
+        return [output_variable(proposalShape, self.inputs[0].dtype, self.inputs[0].dynamic_axes,
+                            name="rpn_rois_raw", needs_gradient=False)]
 
     def forward(self, arguments, device=None, outputs_to_retain=None):
         # Algorithm:

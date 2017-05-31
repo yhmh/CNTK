@@ -34,21 +34,24 @@ cfg = __C
 
 __C.CNTK = edict()
 
-__C.CNTK.FAST_MODE = True
-__C.CNTK.INVESTIGATE_ALIAS_BUG = False
-__C.CNTK.INVESTIGATE_CLONE_BUG = False
 __C.CNTK.INVESTIGATE_FREE_DIMENSION = False
 
-__C.CNTK.TRAIN_E2E = False
+__C.CNTK.FAST_MODE = False
 __C.CNTK.MAKE_MODE = False
-__C.CNTK.DEBUG_OUTPUT = False
+__C.CNTK.TRAIN_E2E = False
+__C.CNTK.DEBUG_OUTPUT = True
+__C.CNTK.USE_MEAN_GRADIENT = False
 
-__C.CNTK.DATASET = "Pascal" # "Grocery" or "Pascal"
+__C.CNTK.DATASET = "Grocery" # "Grocery" or "Pascal"
 __C.CNTK.BASE_MODEL = "AlexNet" # "VGG16" or "AlexNet"
 __C.CNTK.MAX_EPOCHS_E2E = 20
 __C.CNTK.INPUT_ROIS_PER_IMAGE = 50
 __C.CNTK.IMAGE_WIDTH = 1000
 __C.CNTK.IMAGE_HEIGHT = 1000
+
+__C.CNTK.GRAPH_TYPE = "png" # "png" or "pdf"
+__C.CNTK.FEATURE_STREAM_NAME = 'features'
+__C.CNTK.ROI_STREAM_NAME = 'roiAndLabel'
 
 #
 # Training options
