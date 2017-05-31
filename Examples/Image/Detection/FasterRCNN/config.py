@@ -42,14 +42,87 @@ __C.CNTK.USE_MEAN_GRADIENT = False
 
 __C.CNTK.DATASET = "Grocery" # "Grocery" or "Pascal"
 __C.CNTK.BASE_MODEL = "AlexNet" # "VGG16" or "AlexNet"
+
+# Learning parameters
+__C.CNTK.L2_REG_WEIGHT = 0.0005
+__C.CNTK.MOMENTUM_PER_MB = 0.9
+
+# E2E config
+# Caffe Faster R-CNN parameters are: base_lr: 0.001, lr_policy: "step", gamma: 0.1, stepsize: 50000, momentum: 0.9, weight_decay: 0.0005
+# ==> CNTK: lr_per_sample = [0.001] * 10 + [0.0001] * 10 + [0.00001]
 __C.CNTK.MAX_EPOCHS_E2E = 20
+__C.CNTK.E2E_LR_PER_SAMPLE = [0.00001] * 10 + [0.000001] * 10 + [0.000001]
+
+# caffe rpn training: lr = [0.001] * 12 + [0.0001] * 4, momentum = 0.9, weight decay = 0.0005 (cf. stage1_rpn_solver60k80k.pt)
+__C.CNTK.RPN_EPOCHS = 4
+__C.CNTK.RPN_LR_PER_SAMPLE = [0.002] * 4 + [0.001] * 4 + [0.0005] * 4 + [0.0001] * 4
+
+# caffe frcn training: lr = [0.001] * 6 + [0.0001] * 2, momentum = 0.9, weight decay = 0.0005 (cf. stage1_fast_rcnn_solver30k40k.pt)
+__C.CNTK.FRCN_EPOCHS = 20
+__C.CNTK.FRCN_LR_PER_SAMPLE = [0.00002] * 8 + [0.00001] * 6 + [0.000001] * 6
+
 __C.CNTK.INPUT_ROIS_PER_IMAGE = 50
 __C.CNTK.IMAGE_WIDTH = 1000
 __C.CNTK.IMAGE_HEIGHT = 1000
 
 __C.CNTK.GRAPH_TYPE = "png" # "png" or "pdf"
+__C.CNTK.DRAW_NEGATIVE_ROIS = False
+__C.CNTK.ROI_PLOT_THRESHOLD = 0.4
+
 __C.CNTK.FEATURE_STREAM_NAME = 'features'
 __C.CNTK.ROI_STREAM_NAME = 'roiAndLabel'
+
+
+#
+# Data sets
+#
+if __C.CNTK.DATASET == "Grocery":
+    __C.CNTK.CLASSES = ('__background__',  # always index 0
+                        'avocado', 'orange', 'butter', 'champagne', 'eggBox', 'gerkin', 'joghurt', 'ketchup',
+                        'orangeJuice', 'onion', 'pepper', 'tomato', 'water', 'milk', 'tabasco', 'mustard')
+    __C.CNTK.MAP_FILE_PATH = "Data/Grocery"
+    __C.CNTK.TRAIN_MAP_FILE = "train.imgMap.txt"
+    __C.CNTK.TEST_MAP_FILE = "test.imgMap.txt"
+    __C.CNTK.TRAIN_ROI_FILE = "train.GTRois.txt"
+    __C.CNTK.TEST_ROI_FILE = "test.GTRois.txt"
+    __C.CNTK.NUM_TRAIN_IMAGES = 20
+    __C.CNTK.NUM_TEST_IMAGES = 5
+
+if __C.CNTK.DATASET == "Pascal":
+    __C.CNTK.CLASSES = ('__background__',  # always index 0
+                        'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable',
+                        'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor')
+    __C.CNTK.MAP_FILE_PATH = "Data/Pascal"
+    __C.CNTK.TRAIN_MAP_FILE = "trainval2007.txt"
+    __C.CNTK.TEST_MAP_FILE = "test2007.txt"
+    __C.CNTK.TRAIN_ROI_FILE = "trainval2007_rois_topleft_wh_rel_pad.txt"
+    __C.CNTK.TEST_ROI_FILE = "test2007_rois_topleft_wh_rel_pad.txt"
+    __C.CNTK.NUM_TRAIN_IMAGES = 5010
+    __C.CNTK.NUM_TEST_IMAGES = 4952
+
+#
+# Base models
+#
+
+if __C.CNTK.BASE_MODEL == "AlexNet":
+    __C.CNTK.BASE_MODEL_FILE = "AlexNet.model"
+    __C.CNTK.FEATURE_NODE_NAME = "features"
+    __C.CNTK.LAST_CONV_NODE_NAME = "conv5.y"
+    __C.CNTK.START_TRAIN_CONV_NODE_NAME = None # "conv3.y"
+    __C.CNTK.POOL_NODE_NAME = "pool3"
+    __C.CNTK.LAST_HIDDEN_NODE_NAME = "h2_d"
+    __C.CNTK.ROI_DIM = 6
+    __C.CNTK.PROPOSAL_LAYER_PARAMS = "'feat_stride': 16\n'scales':\n - 8 \n - 16 \n - 32"
+
+if __C.CNTK.BASE_MODEL == "VGG16":
+    __C.CNTK.BASE_MODEL_FILE = "VGG16_ImageNet.cntkmodel"
+    __C.CNTK.FEATURE_NODE_NAME = "data"
+    __C.CNTK.LAST_CONV_NODE_NAME = "conv5_3"
+    __C.CNTK.START_TRAIN_CONV_NODE_NAME = None  # "conv3_1"
+    __C.CNTK.POOL_NODE_NAME = "pool5"
+    __C.CNTK.LAST_HIDDEN_NODE_NAME = "drop7"
+    __C.CNTK.ROI_DIM = 7
+    __C.CNTK.PROPOSAL_LAYER_PARAMS = "'feat_stride': 16\n'scales':\n - 8 \n - 16 \n - 32"
 
 #
 # Training options
@@ -181,9 +254,9 @@ __C.TEST.PROPOSAL_METHOD = 'selective_search'
 ## NMS threshold used on RPN proposals
 __C.TEST.RPN_NMS_THRESH = 0.7
 ## Number of top scoring boxes to keep before apply NMS to RPN proposals
-__C.TEST.RPN_PRE_NMS_TOP_N = 6000
+__C.TEST.RPN_PRE_NMS_TOP_N = 10000 # 6000
 ## Number of top scoring boxes to keep after applying NMS to RPN proposals
-__C.TEST.RPN_POST_NMS_TOP_N = 300
+__C.TEST.RPN_POST_NMS_TOP_N = 2000 # 300
 # Proposal height and width both need to be greater than RPN_MIN_SIZE (at orig image scale)
 __C.TEST.RPN_MIN_SIZE = 16
 

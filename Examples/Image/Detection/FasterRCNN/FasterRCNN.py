@@ -10,7 +10,7 @@ import os, sys
 import argparse
 import cntk
 from cntk import Trainer, UnitType, load_model, user_function, Axis, input_variable, parameter, times, combine, relu, \
-    softmax, roipooling, reduce_sum as reduce_mean, slice, splice, reshape, plus, CloneMethod, minus, element_times, alias, Communicator
+    softmax, roipooling, reduce_sum, slice, splice, reshape, plus, CloneMethod, minus, element_times, alias, Communicator
 from cntk.io import MinibatchSource, ImageDeserializer, CTFDeserializer, StreamDefs, StreamDef, TraceLevel
 from cntk.io.transforms import scale
 from cntk.initializer import glorot_uniform, normal
@@ -43,125 +43,42 @@ from config import cfg
 
 ###############################################################
 ###############################################################
-globalvars = {}
-globalvars['output_path'] = os.path.join(abs_path, "Output")
-
 mb_size = 1
 image_width = cfg["CNTK"].IMAGE_WIDTH
 image_height = cfg["CNTK"].IMAGE_HEIGHT
 num_channels = 3
 im_info = cntk.constant([image_width, image_height, 1], (3,))
 
+globalvars = {}
+globalvars['output_path'] = os.path.join(abs_path, "Output")
+
 # dataset specific parameters
-dataset = cfg["CNTK"].DATASET
-if dataset == "Grocery":
-    classes = ('__background__',  # always index 0
-               'avocado', 'orange', 'butter', 'champagne', 'eggBox', 'gerkin', 'joghurt', 'ketchup',
-               'orangeJuice', 'onion', 'pepper', 'tomato', 'water', 'milk', 'tabasco', 'mustard')
-    base_path = os.path.join(abs_path, "Data", "Grocery")
-    globalvars['train_map_file'] = "train.imgMap.txt"
-    globalvars['test_map_file'] = "test.imgMap.txt"
-    globalvars['train_roi_file'] = "train.GTRois.txt"
-    globalvars['test_roi_file'] = "test.GTRois.txt"
-    num_classes = len(classes)
-    epoch_size = 20
-    num_test_images = 5
-elif dataset == "Pascal":
-    classes = ('__background__',  # always index 0
-               'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable',
-               'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor')
-    base_path = os.path.join(abs_path, "Data", "Pascal")
-    globalvars['train_map_file'] = "trainval2007.txt"
-    globalvars['test_map_file'] = "test2007.txt"
-    globalvars['train_roi_file'] = "trainval2007_rois_topleft_wh_rel_pad.txt"
-    globalvars['test_roi_file'] = "test2007_rois_topleft_wh_rel_pad.txt"
-    num_classes = len(classes)
-    epoch_size = 5010
-    num_test_images = 100 # 4952
-else:
-    raise ValueError('unknown data set: %s' % dataset)
+classes = cfg["CNTK"].CLASSES
+num_classes = len(classes)
+map_file_path = os.path.join(abs_path, cfg["CNTK"].MAP_FILE_PATH)
+globalvars['train_map_file'] = cfg["CNTK"].TRAIN_MAP_FILE
+globalvars['test_map_file'] = cfg["CNTK"].TEST_MAP_FILE
+globalvars['train_roi_file'] = cfg["CNTK"].TRAIN_ROI_FILE
+globalvars['test_roi_file'] = cfg["CNTK"].TEST_ROI_FILE
+epoch_size = cfg["CNTK"].NUM_TRAIN_IMAGES
+num_test_images = cfg["CNTK"].NUM_TEST_IMAGES
 
-# model specific variables
-base_model_to_use = cfg["CNTK"].BASE_MODEL
+# model specific parameters
 model_folder = os.path.join(abs_path, "..", "..", "PretrainedModels")
-if base_model_to_use == "AlexNet":
-    base_model_file = os.path.join(model_folder, "AlexNet.model")
-    feature_node_name = "features"
-    last_conv_node_name = "conv5.y"
-    start_train_conv_node_name = None # "conv3.y"
-    pool_node_name = "pool3"
-    last_hidden_node_name = "h2_d"
-    roi_dim = 6
-    proposal_layer_params = "'feat_stride': 16\n'scales':\n - 8 \n - 16 \n - 32"
-elif base_model_to_use == "VGG16":
-    base_model_file = os.path.join(model_folder, "VGG16_ImageNet.cntkmodel")
-    feature_node_name = "data"
-    last_conv_node_name = "conv5_3"
-    start_train_conv_node_name = None # "conv3_1"
-    pool_node_name = "pool5"
-    last_hidden_node_name = "drop7"
-    roi_dim = 7
-    proposal_layer_params = "'feat_stride': 16\n'scales':\n - 8 \n - 16 \n - 32"
-else:
-    raise ValueError('unknown base model: %s' % base_model_to_use)
+base_model_file = os.path.join(model_folder, cfg["CNTK"].BASE_MODEL_FILE)
+feature_node_name = cfg["CNTK"].FEATURE_NODE_NAME
+last_conv_node_name = cfg["CNTK"].LAST_CONV_NODE_NAME
+start_train_conv_node_name = cfg["CNTK"].START_TRAIN_CONV_NODE_NAME
+pool_node_name = cfg["CNTK"].POOL_NODE_NAME
+last_hidden_node_name = cfg["CNTK"].LAST_HIDDEN_NODE_NAME
+roi_dim = cfg["CNTK"].ROI_DIM
 ###############################################################
 ###############################################################
-
-def get_4stage_learning_parameters():
-    lrp = {}
-
-    # Learning parameters
-    lrp['l2_reg_weight'] = 0.0005
-    lrp['momentumPerMB'] = 0.9
-
-    # caffe rpn training: lr = [0.001] * 12 + [0.0001] * 4, momentum = 0.9, weight decay = 0.0005 (cf. stage1_rpn_solver60k80k.pt)
-    if base_model_to_use == "VGG16":
-        lrp['rpn_epochs'] = 4 #16
-        lrp['rpn_lr_per_sample'] = [0.001] * 12 + [0.0001] * 4
-    else:
-        if dataset == "Pascal":
-            lrp['rpn_epochs'] = 4 #16
-            lrp['rpn_lr_per_sample'] = [0.001] * 12 + [0.0001] * 4
-        else:
-            lrp['rpn_epochs'] = 16
-            lrp['rpn_lr_per_sample'] = [0.002] * 4 + [0.001] * 4 + [0.0005] * 4 + [0.0001] * 4
-    if start_train_conv_node_name != None:
-        # TODO: this should be handled through different learning rates for the conv layers only
-        # This is needed due to adding up all gradient in the ROI-pooling layer.
-        # The below learning rates are then too small for the other layers and yield bad results.
-        lrp['rpn_lr_per_sample'] = [x * 0.01 for x in lrp['rpn_lr_per_sample']]
-
-    # caffe frcn training: lr = [0.001] * 6 + [0.0001] * 2, momentum = 0.9, weight decay = 0.0005 (cf. stage1_fast_rcnn_solver30k40k.pt)
-    if base_model_to_use == "VGG16":
-        lrp['frcn_epochs'] = 8
-        #lrp['frcn_lr_per_sample'] = [0.001] * 6 + [0.0001] * 2 # --> loss goes to nan
-        lrp['frcn_lr_per_sample'] = [0.0002] * 6 + [0.00005] * 2
-        #lrp['frcn_lr_per_sample'] = [0.00002] * 8 + [0.00001] * 6 + [0.000001] * 6
-    else:
-        if dataset == "Pascal":
-            lrp['frcn_epochs'] = 8
-            #lrp['frcn_lr_per_sample'] = [0.001] * 6 + [0.0001] * 2 # --> loss goes to nan
-            lrp['frcn_lr_per_sample'] = [0.00002] * 8 + [0.00001] * 6 + [0.000001] * 6
-            #lrp['frcn_lr_per_sample'] = [0.00001] * 6 + [0.000001] * 2
-        else:
-            lrp['frcn_epochs'] = 20
-            lrp['frcn_lr_per_sample'] = [0.00002] * 8 + [0.00001] * 6 + [0.000001] * 6
-    if start_train_conv_node_name != None:
-        # TODO: this should be handled through different learning rates for the conv layers only
-        # This is needed due to adding up all gradient in the ROI-pooling layer.
-        # The below learning rates are then too small for the other layers and yield bad results.
-        lrp['frcn_lr_per_sample'] = [x * 0.01 for x in lrp['frcn_lr_per_sample']]
-
-    if cfg["CNTK"].FAST_MODE:
-        lrp['rpn_epochs'] = 1
-        lrp['frcn_epochs'] = 1
-
-    return lrp
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
 
-    data_path = base_path
+    data_path = map_file_path
     parser.add_argument('-datadir', '--datadir', help='Data directory where the ImageNet dataset is located',
                         required=False, default=data_path)
     parser.add_argument('-outputdir', '--outputdir', help='Output directory for checkpoints and models',
@@ -273,7 +190,7 @@ def create_faster_rcnn_predictor(features, scaled_gt_boxes):
 
     # RPN
     rpn_rois, rpn_losses = create_rpn(conv_out, scaled_gt_boxes, im_info,
-                                      proposal_layer_param_string=proposal_layer_params)
+                                      proposal_layer_param_string=cfg["CNTK"].PROPOSAL_LAYER_PARAMS)
     rois, label_targets, bbox_targets, bbox_inside_weights = \
         create_proposal_target_layer(rpn_rois, scaled_gt_boxes, num_classes=num_classes)
 
@@ -283,7 +200,7 @@ def create_faster_rcnn_predictor(features, scaled_gt_boxes):
     # loss functions
     loss_cls = cross_entropy_with_softmax(cls_score, label_targets, axis=1)
     loss_box = user_function(SmoothL1Loss(bbox_pred, bbox_targets, bbox_inside_weights))
-    detection_losses = reduce_mean(loss_cls) + reduce_mean(loss_box)
+    detection_losses = reduce_sum(loss_cls) + reduce_sum(loss_box)
 
     loss = rpn_losses + detection_losses
     pred_error = classification_error(cls_score, label_targets, axis=1)
@@ -379,24 +296,11 @@ def train_faster_rcnn_e2e(debug_output=False):
         plot(loss, os.path.join(globalvars['output_path'], "graph_frcn_train_e2e." + cfg["CNTK"].GRAPH_TYPE))
 
     # Set learning parameters
-    # Caffe Faster R-CNN parameters are:
-    #   base_lr: 0.001
-    #   lr_policy: "step"
-    #   gamma: 0.1
-    #   stepsize: 50000
-    #   momentum: 0.9
-    #   weight_decay: 0.0005
-    # ==> CNTK: lr_per_sample = [0.001] * 10 + [0.0001] * 10 + [0.00001]
-    l2_reg_weight = 0.0005
-    #lr_per_sample = [0.001] * 10 + [0.0001] * 10 + [0.00001]
-    lr_per_sample = [0.00001] * 10 + [0.000001] * 10 + [0.000001]
-    lr_schedule = learning_rate_schedule(lr_per_sample, unit=UnitType.sample)
-    mm_schedule = momentum_schedule(0.9)
-
-    import pdb; pdb.set_trace()
+    lr_schedule = learning_rate_schedule(cfg["CNTK"].E2E_LR_PER_SAMPLE, unit=UnitType.sample)
+    mm_schedule = momentum_schedule(cfg["CNTK"].MOMENTUM_PER_MB)
 
     train_model(image_input, roi_input, loss, pred_error,
-                lr_schedule, mm_schedule, l2_reg_weight, epochs_to_train=cfg["CNTK"].MAX_EPOCHS_E2E)
+                lr_schedule, mm_schedule, cfg["CNTK"].L2_REG_WEIGHT, cfg["CNTK"].MAX_EPOCHS_E2E)
     return loss
 
 # Trains a Faster R-CNN model using 4-stage alternating training
@@ -422,14 +326,12 @@ def train_faster_rcnn_alternating(debug_output=False):
     '''
 
     # Learning parameters
-    lrp = get_4stage_learning_parameters()
-
-    l2_reg_weight = lrp['l2_reg_weight']
-    mm_schedule = momentum_schedule(lrp['momentumPerMB'])
-    rpn_epochs = lrp ['rpn_epochs']
-    rpn_lr_schedule = learning_rate_schedule(lrp['rpn_lr_per_sample'], unit=UnitType.sample)
-    frcn_epochs = lrp['frcn_epochs']
-    frcn_lr_schedule = learning_rate_schedule(lrp['frcn_lr_per_sample'], unit=UnitType.sample)
+    l2_reg_weight = cfg["CNTK"].L2_REG_WEIGHT
+    mm_schedule = momentum_schedule(cfg["CNTK"].MOMENTUM_PER_MB)
+    rpn_epochs = 1 if cfg["CNTK"].FAST_MODE else cfg["CNTK"].RPN_EPOCHS
+    rpn_lr_schedule = learning_rate_schedule(cfg["CNTK"].RPN_LR_PER_SAMPLE, unit=UnitType.sample)
+    frcn_epochs = 1 if cfg["CNTK"].FAST_MODE else cfg["CNTK"].FRCN_EPOCHS
+    frcn_lr_schedule = learning_rate_schedule(cfg["CNTK"].FRCN_LR_PER_SAMPLE, unit=UnitType.sample)
 
     # Input variables denoting features and labeled ground truth rois (as 5-tuples per roi)
     image_input = input_variable((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()],
@@ -443,10 +345,10 @@ def train_faster_rcnn_alternating(debug_output=False):
     # base image classification model (e.g. VGG16 or AlexNet)
     base_model = load_model(base_model_file)
 
-    print("Using base model: {}".format(base_model_to_use))
-    print("rpn_lr_per_sample: {}".format(lrp['rpn_lr_per_sample']))
+    print("Using base model: {}".format(cfg["CNTK"].BASE_MODEL))
+    print("rpn_lr_per_sample: {}".format(cfg["CNTK"].RPN_LR_PER_SAMPLE))
     print("rpn_epochs: {}".format(rpn_epochs))
-    print("frcn_lr_per_sample: {}".format(lrp['frcn_lr_per_sample']))
+    print("frcn_lr_per_sample: {}".format(cfg["CNTK"].FRCN_LR_PER_SAMPLE))
     print("frcn_epochs: {}".format(frcn_epochs))
     if debug_output:
         print("Storing graphs and models to %s." % globalvars['output_path'])
@@ -474,7 +376,7 @@ def train_faster_rcnn_alternating(debug_output=False):
 
         # RPN and losses
         rpn_rois, rpn_losses = create_rpn(conv_out, scaled_gt_boxes, im_info,
-                                          proposal_layer_param_string=proposal_layer_params)
+                                          proposal_layer_param_string=cfg["CNTK"].PROPOSAL_LAYER_PARAMS)
         stage1_rpn_network = combine([rpn_rois, rpn_losses])
 
         # train
@@ -519,7 +421,7 @@ def train_faster_rcnn_alternating(debug_output=False):
         # loss functions
         loss_cls = cross_entropy_with_softmax(cls_score, label_targets, axis=1)
         loss_box = user_function(SmoothL1Loss(bbox_pred, bbox_targets, bbox_inside_weights))
-        detection_losses = plus(reduce_mean(loss_cls), reduce_mean(loss_box), name="detection_losses")
+        detection_losses = plus(reduce_sum(loss_cls), reduce_sum(loss_box), name="detection_losses")
         stage1_frcn_network = combine([rois, cls_score, bbox_pred, rpn_losses, detection_losses])
 
         # train
@@ -631,8 +533,8 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
 # The main method trains and evaluates a Fast R-CNN model.
 # If a trained model is already available it is loaded an no training will be performed.
 if __name__ == '__main__':
-    if os.path.exists(base_path):
-        os.chdir(base_path)
+    if os.path.exists(map_file_path):
+        os.chdir(map_file_path)
         if not os.path.exists(os.path.join(abs_path, "Output")):
             os.makedirs(os.path.join(abs_path, "Output"))
         if not os.path.exists(os.path.join(abs_path, "Output", "Grocery")):
@@ -640,15 +542,9 @@ if __name__ == '__main__':
         if not os.path.exists(os.path.join(abs_path, "Output", "Pascal")):
             os.makedirs(os.path.join(abs_path, "Output", "Pascal"))
 
-    #import pdb; pdb.set_trace()
-    #caffe_model = r"C:\Temp\Yuxiao_20170428_converted_models\VGG16_faster_rcnn_final.cntkmodel"
-    #dummy = load_model(caffe_model)
-    #plot(dummy, r"C:\Temp\Yuxiao_20170428_converted_models\VGG16_faster_rcnn_final.cntkmodel.pdf")
-    #import pdb; pdb.set_trace()
-
     parse_arguments()
     model_path = os.path.join(globalvars['output_path'], "faster_rcnn_eval_{}_{}.model"
-                              .format(base_model_to_use, "e2e" if cfg["CNTK"].TRAIN_E2E else "4stage"))
+                              .format(cfg["CNTK"].BASE_MODEL, "e2e" if cfg["CNTK"].TRAIN_E2E else "4stage"))
 
     # Train only if no model exists yet
     if os.path.exists(model_path) and cfg["CNTK"].MAKE_MODE:
@@ -666,17 +562,18 @@ if __name__ == '__main__':
         eval_model.save(model_path)
         if cfg["CNTK"].DEBUG_OUTPUT:
             plot(eval_model, os.path.join(globalvars['output_path'], "graph_frcn_eval_{}_{}.{}"
-                                          .format(base_model_to_use, "e2e" if cfg["CNTK"].TRAIN_E2E else "4stage", cfg["CNTK"].GRAPH_TYPE)))
+                                          .format(cfg["CNTK"].BASE_MODEL, "e2e" if cfg["CNTK"].TRAIN_E2E else "4stage", cfg["CNTK"].GRAPH_TYPE)))
 
         print("Stored eval model at %s" % model_path)
 
-    # Evaluate the test set
+    # Plot results on test set
     if cfg["CNTK"].DEBUG_OUTPUT:
         from cntk_helpers import eval_and_plot_faster_rcnn
-        num_eval = min(num_test_images, 500)
+        num_eval = min(num_test_images, 100)
         img_shape = (num_channels, image_height, image_width)
-        results_base_path = os.path.join(globalvars['output_path'], dataset)
+        results_map_file_path = os.path.join(globalvars['output_path'], cfg["CNTK"].DATASET)
         eval_and_plot_faster_rcnn(eval_model, num_eval, globalvars['test_map_file'], img_shape,
-                                  results_base_path, feature_node_name, classes, debug_output=True)
+                                  results_map_file_path, feature_node_name, classes, debug_output=True,
+                                  drawNegativeRois=cfg["CNTK"].DRAW_NEGATIVE_ROIS, decisionThreshold=cfg["CNTK"].ROI_PLOT_THRESHOLD)
 
     #eval_faster_rcnn_mAP(eval_model, globalvars['test_map_file'], globalvars['test_roi_file'])

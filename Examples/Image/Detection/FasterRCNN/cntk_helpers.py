@@ -129,7 +129,8 @@ def regress_rois(roi_proposals, roi_regression_factors, labels):
 
 # Tests a Faster R-CNN model and plots images with detected boxes
 def eval_and_plot_faster_rcnn(eval_model, num_images_to_plot, test_map_file, img_shape,
-                              results_base_path, feature_node_name, classes, debug_output=False):
+                              results_base_path, feature_node_name, classes,
+                              debug_output=False, drawNegativeRois=False, decisionThreshold = 0.8):
     # get image paths
     with open(test_map_file) as f:
         content = f.readlines()
@@ -159,13 +160,13 @@ def eval_and_plot_faster_rcnn(eval_model, num_images_to_plot, test_map_file, img
         if debug_output:
             # plot results without final regression
             imgDebug = visualizeResultsFaster(imgPath, labels, scores, out_rpn_rois, 1000, 1000,
-                                              classes, nmsKeepIndices=None, boDrawNegativeRois=True)
+                                              classes, nmsKeepIndices=None, boDrawNegativeRois=drawNegativeRois, decisionThreshold=decisionThreshold)
             imsave("{}/{}_{}".format(results_base_path, i, os.path.basename(imgPath)), imgDebug)
 
         # apply regression to bbox coordinates
         regressed_rois = regress_rois(out_rpn_rois, out_bbox_regr, labels)
         img = visualizeResultsFaster(imgPath, labels, scores, regressed_rois, 1000, 1000,
-                                     classes, nmsKeepIndices=None, boDrawNegativeRois=True)
+                                     classes, nmsKeepIndices=None, boDrawNegativeRois=drawNegativeRois, decisionThreshold=decisionThreshold)
         imsave("{}/{}_regr_{}".format(results_base_path, i, os.path.basename(imgPath)), img)
 
 
