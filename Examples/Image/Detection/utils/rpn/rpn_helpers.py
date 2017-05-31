@@ -110,16 +110,11 @@ def create_proposal_target_layer(rpn_rois, scaled_gt_boxes, num_classes):
 
     ptl_param_string = "'num_classes': {}".format(num_classes)
     ptl = user_function(ProposalTargetLayer(rpn_rois, scaled_gt_boxes, param_str=ptl_param_string))
-    rois = alias(ptl.outputs[0], name='rpn_target_rois')
 
-    if cfg["CNTK"].INVESTIGATE_FREE_DIMENSION:
-        label_targets = alias(ptl.outputs[1] * 1.0, name='label_targets')
-        bbox_targets = alias(ptl.outputs[2] * 1.0, name='bbox_targets')
-        bbox_inside_weights = alias(ptl.outputs[3] * 1.0, name='bbox_inside_w')
-    else:
-        label_targets = alias(ptl.outputs[1], name='label_targets')
-        bbox_targets = alias(ptl.outputs[2], name='bbox_targets')
-        bbox_inside_weights = alias(ptl.outputs[3], name='bbox_inside_w')
+    rois = alias(ptl.outputs[0], name='rpn_target_rois')
+    label_targets = alias(ptl.outputs[1], name='label_targets')
+    bbox_targets = alias(ptl.outputs[2], name='bbox_targets')
+    bbox_inside_weights = alias(ptl.outputs[3], name='bbox_inside_w')
 
     return rois, label_targets, bbox_targets, bbox_inside_weights
 

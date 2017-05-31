@@ -519,13 +519,6 @@ def train_faster_rcnn_alternating(debug_output=False):
         rois, label_targets, bbox_targets, bbox_inside_weights = \
             create_proposal_target_layer(rpn_rois, scaled_gt_boxes, num_classes=num_classes)
 
-        if cfg["CNTK"].INVESTIGATE_FREE_DIMENSION:
-            from utils.rpn.cntk_debug import DebugLayer
-            rois = user_function(DebugLayer(rois, debug_name="debug_ptl_rois"))
-            label_targets = user_function(DebugLayer(label_targets, debug_name="debug_ptl_label_targets"))
-            bbox_targets = user_function(DebugLayer(bbox_targets, debug_name="debug_ptl_bbox_targets"))
-            bbox_inside_weights = user_function(DebugLayer(bbox_inside_weights, debug_name="debug_ptl_bbiw"))
-
         # Fast RCNN
         fc_layers = clone_model(base_model, [pool_node_name], [last_hidden_node_name], CloneMethod.clone)
         cls_score, bbox_pred = create_fast_rcnn_predictor(conv_out, rois, fc_layers)
