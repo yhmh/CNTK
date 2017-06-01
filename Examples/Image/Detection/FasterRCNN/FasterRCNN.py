@@ -39,6 +39,8 @@ abs_path = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(abs_path, ".."))
 from utils.rpn.rpn_helpers import create_rpn, create_proposal_target_layer
 from utils.rpn.cntk_smoothL1_loss import SmoothL1Loss
+from utils.map.map_helpers import evaluate_detections
+from cntk_helpers import regress_rois
 from config import cfg
 
 ###############################################################
@@ -505,30 +507,57 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
 
     # evaluate test images and write netwrok output to file
     print("Evaluating Faster R-CNN model for %s images." % num_test_images)
-    for i in range(0, num_test_images):
+    all_gt_infos = {key: [] for key in classes}
+    for img_i in range(0, num_test_images):
         mb_data = minibatch_source.next_minibatch(1, input_map=input_map)
-        keys = [k for k in mb_data if "features" not in str(k)]
-        gt_row = mb_data[keys[0]].asarray()[0,0,:]
-        gt_boxes = gt_row.reshape((cfg["CNTK"].INPUT_ROIS_PER_IMAGE, 5))
-        gt_boxes = gt_boxes[np.where(gt_boxes[:,-1] > 0)]
+        rkeys = [k for k in mb_data if "features" not in str(k)]
+        gt_row = mb_data[rkeys[0]].asarray()[0,0,:]
+        all_gt_boxes = gt_row.reshape((cfg["CNTK"].INPUT_ROIS_PER_IMAGE, 5))
+        all_gt_boxes = all_gt_boxes[np.where(all_gt_boxes[:,-1] > 0)]
 
-        output = frcn_eval.eval(mb_data)
+        # transform from (x, y, w, h) relative to (x_min, y_min, x_max, y_max) absolute
+        gt_coords = all_gt_boxes[:, :4]
+        gt_labels = all_gt_boxes[:, 4:]
+        gt_coords = gt_coords * 1000.0
+        wh = gt_coords[:,2:4]
+        gt_coords[:,2:4] = gt_coords[:,0:2] + wh
+        all_gt_boxes = np.hstack((gt_coords, gt_labels))
+
+        for cls_index, cls_name in enumerate(classes):
+            if cls_index == 0: continue
+            #   gtBoxes = [box for box, label in zip(gtBoxes, gtLabels) if
+            #              label.decode('utf-8') == self.classes[classIndex]]
+            cls_gt_boxes = all_gt_boxes[np.where(all_gt_boxes[:,-1] == cls_index)]
+            #   gtInfos.append({'bbox': np.array(gtBoxes),
+            #                   'difficult': [False] * len(gtBoxes),
+            #                   'det': [False] * len(gtBoxes)})
+            all_gt_infos[cls_name].append({'bbox': np.array(cls_gt_boxes),
+                                           'difficult': [False] * len(cls_gt_boxes),
+                                           'det': [False] * len(cls_gt_boxes)})
+
+        fkeys = [k for k in mb_data if "features" in str(k)]
+        output = frcn_eval.eval({fkeys[0]: mb_data[fkeys[0]]})
         out_dict = dict([(k.name, k) for k in output])
         out_cls_pred = output[out_dict['cls_pred']][0]                      # (300, 17)
         out_rpn_rois = output[out_dict['rpn_rois']][0]
         out_bbox_regr = output[out_dict['bbox_regr']][0]
 
         labels = out_cls_pred.argmax(axis=1)
-        scores = out_cls_pred.max(axis=1).tolist()
+        scores = out_cls_pred.max(axis=1)
         regressed_rois = regress_rois(out_rpn_rois, out_bbox_regr, labels)  # (300, 4)
 
-        import pdb; pdb.set_trace()
-        for j in range(1, num_classes):
-            all_boxes[j][i] = \
-                np.hstack((regressed_rois, out_cls_pred[:, j])) \
-                    .astype(np.float32, copy=False)
-            # TODO: calculate mAP
 
+        labels.shape = labels.shape + (1,)
+        scores.shape = scores.shape + (1,)
+        coords_score_label = np.hstack((regressed_rois, scores, labels))
+
+        #   shape of all_boxes: e.g. 21 classes x 4952 images x 58 rois x 5 coords+score
+        for cls_j in range(1, num_classes):
+            coords_score_label_for_cls = coords_score_label[np.where(coords_score_label[:,-1] == cls_j)]
+            all_boxes[cls_j][img_i] = coords_score_label_for_cls[:,:-1].astype(np.float32, copy=False)
+
+    # calculate mAP
+    evaluate_detections(all_boxes, all_gt_infos, classes)
 
 # The main method trains and evaluates a Fast R-CNN model.
 # If a trained model is already available it is loaded an no training will be performed.
@@ -566,6 +595,8 @@ if __name__ == '__main__':
 
         print("Stored eval model at %s" % model_path)
 
+    eval_faster_rcnn_mAP(eval_model, globalvars['test_map_file'], globalvars['test_roi_file'])
+
     # Plot results on test set
     if cfg["CNTK"].DEBUG_OUTPUT:
         from cntk_helpers import eval_and_plot_faster_rcnn
@@ -576,4 +607,3 @@ if __name__ == '__main__':
                                   results_map_file_path, feature_node_name, classes, debug_output=True,
                                   drawNegativeRois=cfg["CNTK"].DRAW_NEGATIVE_ROIS, decisionThreshold=cfg["CNTK"].ROI_PLOT_THRESHOLD)
 
-    #eval_faster_rcnn_mAP(eval_model, globalvars['test_map_file'], globalvars['test_roi_file'])
