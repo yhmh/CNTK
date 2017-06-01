@@ -7,9 +7,10 @@ from builtins import range
 import cv2, copy, textwrap
 from PIL import Image, ImageFont, ImageDraw
 from PIL.ExifTags import TAGS
+from matplotlib.pyplot import imsave
 from cntk import input_variable, Axis
 from utils.rpn.bbox_transform import bbox_transform_inv
-from matplotlib.pyplot import imsave
+from utils.rpn.nms_wrapper import applyNonMaximaSuppression
 
 available_font = "arial.ttf"
 try:
@@ -130,7 +131,8 @@ def regress_rois(roi_proposals, roi_regression_factors, labels):
 # Tests a Faster R-CNN model and plots images with detected boxes
 def eval_and_plot_faster_rcnn(eval_model, num_images_to_plot, test_map_file, img_shape,
                               results_base_path, feature_node_name, classes,
-                              debug_output=False, drawNegativeRois=False, decisionThreshold = 0.8):
+                              drawUnregressedRois=False, drawNegativeRois=False,
+                              nmsThreshold=0.5, decisionThreshold = 0.8):
     # get image paths
     with open(test_map_file) as f:
         content = f.readlines()
@@ -141,7 +143,7 @@ def eval_and_plot_faster_rcnn(eval_model, num_images_to_plot, test_map_file, img
     image_input = input_variable(img_shape, dynamic_axes=[Axis.default_batch_axis()], name=feature_node_name)
     frcn_eval = eval_model(image_input)
 
-    print("Evaluating Faster R-CNN model for %s images." % num_images_to_plot)
+    print("Plotting results from Faster R-CNN model for %s images." % num_images_to_plot)
     for i in range(0, num_images_to_plot):
         imgPath = img_file_names[i]
 
@@ -157,16 +159,20 @@ def eval_and_plot_faster_rcnn(eval_model, num_images_to_plot, test_map_file, img
         labels = out_cls_pred.argmax(axis=1)
         scores = out_cls_pred.max(axis=1).tolist()
 
-        if debug_output:
+        if drawUnregressedRois:
             # plot results without final regression
             imgDebug = visualizeResultsFaster(imgPath, labels, scores, out_rpn_rois, 1000, 1000,
                                               classes, nmsKeepIndices=None, boDrawNegativeRois=drawNegativeRois, decisionThreshold=decisionThreshold)
             imsave("{}/{}_{}".format(results_base_path, i, os.path.basename(imgPath)), imgDebug)
 
-        # apply regression to bbox coordinates
+        # apply regression and nms to bbox coordinates
         regressed_rois = regress_rois(out_rpn_rois, out_bbox_regr, labels)
+        nmsKeepIndices = applyNonMaximaSuppression(regressed_rois, labels, scores,
+                                                   nms_threshold=nmsThreshold, conf_threshold=decisionThreshold)
+
         img = visualizeResultsFaster(imgPath, labels, scores, regressed_rois, 1000, 1000,
-                                     classes, nmsKeepIndices=None, boDrawNegativeRois=drawNegativeRois, decisionThreshold=decisionThreshold)
+                                     classes, nmsKeepIndices=nmsKeepIndices,
+                                     boDrawNegativeRois=drawNegativeRois, decisionThreshold=decisionThreshold)
         imsave("{}/{}_regr_{}".format(results_base_path, i, os.path.basename(imgPath)), img)
 
 

@@ -5,57 +5,29 @@
 # ==============================================================================
 
 import numpy as np
+from utils.rpn.nms_wrapper import apply_nms
 
-#from builtins import str
-
-# def readFile(inputFile):
-#     #reading as binary, to avoid problems with end-of-text characters
-#     #note that readlines() does not remove the line ending characters
-#     with open(inputFile,'rb') as f:
-#         lines = f.readlines()
-#     return [removeLineEndCharacters(s) for s in lines]
-#
-# def readTable(inputFile, delimiter='\t', columnsToKeep=None):
-#     lines = readFile(inputFile);
-#     if columnsToKeep != None:
-#         header = lines[0].split(delimiter)
-#         columnsToKeepIndices = listFindItems(header, columnsToKeep)
-#     else:
-#         columnsToKeepIndices = None;
-#     return splitStrings(lines, delimiter, columnsToKeepIndices)
-#
-# def splitString(string, delimiter='\t', columnsToKeepIndices=None):
-#     if string == None:
-#         return None
-#     items = string.decode('utf-8').split(delimiter)
-#     if columnsToKeepIndices != None:
-#         items = getColumns([items], columnsToKeepIndices)
-#         items = items[0]
-#     return items;
-#
-# def splitStrings(strings, delimiter, columnsToKeepIndices=None):
-#     table = [splitString(string, delimiter, columnsToKeepIndices) for string in strings]
-#     return table;
-#
-# def readGtAnnotation(imgPath):
-#     bboxesPath = imgPath[:-4] + ".bboxes.tsv"
-#     labelsPath = imgPath[:-4] + ".bboxes.labels.tsv"
-#     bboxes = np.array(readTable(bboxesPath), np.int32)
-#     labels = readFile(labelsPath)
-#     assert (len(bboxes) == len(labels))
-#     return bboxes, labels
-
-# main call to compute per-calass average precision
+# main call to compute per-class average precision
 #   shape of all_boxes: e.g. 21 classes x 4952 images x 58 rois x 5 coords+score
 #  (see also test_net() in fastRCNN\test.py)
-def evaluate_detections(all_boxes, all_gt_infos, classes, use_07_metric=False):
+def evaluate_detections(all_boxes, all_gt_infos, classes, use_07_metric=False, apply_mms=True, nms_threshold=0.5, conf_threshold=0.0):
+    if apply_mms:
+        print ("Number of rois before non-maxima surpression: %d" % sum([len(all_boxes[i][j]) for i in range(len(all_boxes)) for j in range(len(all_boxes[0]))]))
+        nms_dets,_ = apply_nms(all_boxes, nms_threshold, conf_threshold)
+        print ("Number of rois  after non-maxima surpression: %d" % sum([len(nms_dets[i][j]) for i in range(len(all_boxes)) for j in range(len(all_boxes[0]))]))
+    else:
+        print ("Skipping non-maxima surpression")
+        nms_dets = all_boxes
+
     aps = []
     for classIndex, className in enumerate(classes):
         if className != '__background__':
-            rec, prec, ap = _evaluate_detections(classIndex, all_boxes, all_gt_infos[className], use_07_metric=use_07_metric)
+            rec, prec, ap = _evaluate_detections(classIndex, nms_dets, all_gt_infos[className], use_07_metric=use_07_metric)
             aps += [ap]
             print('AP for {:>15} = {:.4f}'.format(className, ap))
     print('Mean AP = {:.4f}'.format(np.nanmean(aps)))
+
+    return nms_dets
 
 
 def _evaluate_detections(classIndex, all_boxes, gtInfos, overlapThreshold=0.5, use_07_metric=False):

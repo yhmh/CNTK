@@ -557,7 +557,7 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
             all_boxes[cls_j][img_i] = coords_score_label_for_cls[:,:-1].astype(np.float32, copy=False)
 
     # calculate mAP
-    evaluate_detections(all_boxes, all_gt_infos, classes)
+    evaluate_detections(all_boxes, all_gt_infos, classes, nms_threshold=cfg["CNTK"].RESULTS_NMS_THRESHOLD)
 
 # The main method trains and evaluates a Fast R-CNN model.
 # If a trained model is already available it is loaded an no training will be performed.
@@ -602,8 +602,11 @@ if __name__ == '__main__':
         from cntk_helpers import eval_and_plot_faster_rcnn
         num_eval = min(num_test_images, 100)
         img_shape = (num_channels, image_height, image_width)
-        results_map_file_path = os.path.join(globalvars['output_path'], cfg["CNTK"].DATASET)
+        results_folder = os.path.join(globalvars['output_path'], cfg["CNTK"].DATASET)
         eval_and_plot_faster_rcnn(eval_model, num_eval, globalvars['test_map_file'], img_shape,
-                                  results_map_file_path, feature_node_name, classes, debug_output=True,
-                                  drawNegativeRois=cfg["CNTK"].DRAW_NEGATIVE_ROIS, decisionThreshold=cfg["CNTK"].ROI_PLOT_THRESHOLD)
+                                  results_folder, feature_node_name, classes,
+                                  drawUnregressedRois=cfg["CNTK"].DRAW_UNREGRESSED_ROIS,
+                                  drawNegativeRois=cfg["CNTK"].DRAW_NEGATIVE_ROIS,
+                                  nmsThreshold=cfg["CNTK"].RESULTS_NMS_THRESHOLD,
+                                  decisionThreshold=cfg["CNTK"].RESULTS_CONF_THRESHOLD)
 
