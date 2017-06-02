@@ -11,7 +11,7 @@ import yaml
 from utils.default_config import cfg
 from utils.rpn.generate_anchors import generate_anchors
 from utils.rpn.bbox_transform import bbox_transform_inv, clip_boxes
-from utils.rpn.nms_wrapper import nms
+from utils.nms.nms_wrapper import nms
 
 DEBUG = False
 

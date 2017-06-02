@@ -546,7 +546,6 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
         scores = out_cls_pred.max(axis=1)
         regressed_rois = regress_rois(out_rpn_rois, out_bbox_regr, labels)  # (300, 4)
 
-
         labels.shape = labels.shape + (1,)
         scores.shape = scores.shape + (1,)
         coords_score_label = np.hstack((regressed_rois, scores, labels))
@@ -556,8 +555,17 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
             coords_score_label_for_cls = coords_score_label[np.where(coords_score_label[:,-1] == cls_j)]
             all_boxes[cls_j][img_i] = coords_score_label_for_cls[:,:-1].astype(np.float32, copy=False)
 
+        if img_i % 100 == 0:
+            print("Processed {} samples".format(img_i))
+
     # calculate mAP
-    evaluate_detections(all_boxes, all_gt_infos, classes, nms_threshold=cfg["CNTK"].RESULTS_NMS_THRESHOLD)
+    aps = evaluate_detections(all_boxes, all_gt_infos, classes, nms_threshold=cfg["CNTK"].RESULTS_NMS_THRESHOLD)
+    ap_list = []
+    for class_name in aps:
+        ap_list += [aps[class_name]]
+        print('AP for {:>15} = {:.4f}'.format(class_name, aps[class_name]))
+    print('Mean AP = {:.4f}'.format(np.nanmean(ap_list)))
+
 
 # The main method trains and evaluates a Fast R-CNN model.
 # If a trained model is already available it is loaded an no training will be performed.
@@ -598,7 +606,7 @@ if __name__ == '__main__':
     eval_faster_rcnn_mAP(eval_model, globalvars['test_map_file'], globalvars['test_roi_file'])
 
     # Plot results on test set
-    if cfg["CNTK"].DEBUG_OUTPUT:
+    if cfg["CNTK"].VISUALIZE_RESULTS:
         from cntk_helpers import eval_and_plot_faster_rcnn
         num_eval = min(num_test_images, 100)
         img_shape = (num_channels, image_height, image_width)

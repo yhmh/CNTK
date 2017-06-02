@@ -27,7 +27,6 @@ __C = edict()
 #   from fast_rcnn_config import cfg
 cfg = __C
 
-
 #
 # CNTK parameters
 #
@@ -65,11 +64,13 @@ __C.CNTK.INPUT_ROIS_PER_IMAGE = 50
 __C.CNTK.IMAGE_WIDTH = 1000
 __C.CNTK.IMAGE_HEIGHT = 1000
 
-__C.CNTK.GRAPH_TYPE = "png" # "png" or "pdf"
-__C.CNTK.DRAW_NEGATIVE_ROIS = False
-__C.CNTK.DRAW_UNREGRESSED_ROIS = False
 __C.CNTK.RESULTS_NMS_THRESHOLD = 0.3
 __C.CNTK.RESULTS_CONF_THRESHOLD = 0.7
+
+__C.CNTK.GRAPH_TYPE = "png" # "png" or "pdf"
+__C.CNTK.VISUALIZE_RESULTS = False
+__C.CNTK.DRAW_NEGATIVE_ROIS = False
+__C.CNTK.DRAW_UNREGRESSED_ROIS = True
 
 __C.CNTK.FEATURE_STREAM_NAME = 'features'
 __C.CNTK.ROI_STREAM_NAME = 'roiAndLabel'
@@ -195,8 +196,6 @@ __C.TRAIN.PROPOSAL_METHOD = 'selective_search'
 # on zero-padding.
 __C.TRAIN.ASPECT_GROUPING = True
 
-# Use RPN to detect objects
-__C.TRAIN.HAS_RPN = False
 # IOU >= thresh: positive example
 __C.TRAIN.RPN_POSITIVE_OVERLAP = 0.7
 # IOU < thresh: negative example

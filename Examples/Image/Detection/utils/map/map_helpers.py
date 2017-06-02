@@ -5,38 +5,47 @@
 # ==============================================================================
 
 import numpy as np
-from utils.rpn.nms_wrapper import apply_nms
+from utils.nms.nms_wrapper import apply_nms_to_test_set_results
 
-# main call to compute per-class average precision
-#   shape of all_boxes: e.g. 21 classes x 4952 images x 58 rois x 5 coords+score
-#  (see also test_net() in fastRCNN\test.py)
 def evaluate_detections(all_boxes, all_gt_infos, classes, use_07_metric=False, apply_mms=True, nms_threshold=0.5, conf_threshold=0.0):
+    '''
+    Computes per-class average precision.
+
+    Args:
+        all_boxes:          shape of all_boxes: e.g. 21 classes x 4952 images x 58 rois x 5 coords+score
+        all_gt_infos:       a dictionary that contains all ground truth annoations in the following form:
+                            {'class_A': [{'bbox': array([[ 376.,  210.,  456.,  288.,   10.]], dtype=float32), 'det': [False], 'difficult': [False]}, ... ]}
+                            'class_B': [ <bbox_list> ], <more_class_to_bbox_list_entries> }
+        classes:            a list of class name, e.g. ['__background__', 'avocado', 'orange', 'butter']
+        use_07_metric:      whether to use VOC07's 11 point AP computation (default False)
+        apply_mms:          whether to apply non maximum suppression before computing average precision values
+        nms_threshold:      the threshold for discarding overlapping ROIs in nms
+        conf_threshold:     a minimum value for the score of an ROI. ROIs with lower score will be discarded
+
+    Returns:
+        aps - average precision value per class in a dictionary {classname: ap}
+    '''
+
     if apply_mms:
-        print ("Number of rois before non-maxima surpression: %d" % sum([len(all_boxes[i][j]) for i in range(len(all_boxes)) for j in range(len(all_boxes[0]))]))
-        nms_dets,_ = apply_nms(all_boxes, nms_threshold, conf_threshold)
-        print ("Number of rois  after non-maxima surpression: %d" % sum([len(nms_dets[i][j]) for i in range(len(all_boxes)) for j in range(len(all_boxes[0]))]))
+        print ("Number of rois before non-maximum surpression: %d" % sum([len(all_boxes[i][j]) for i in range(len(all_boxes)) for j in range(len(all_boxes[0]))]))
+        nms_dets,_ = apply_nms_to_test_set_results(all_boxes, nms_threshold, conf_threshold)
+        print ("Number of rois  after non-maximum surpression: %d" % sum([len(nms_dets[i][j]) for i in range(len(all_boxes)) for j in range(len(all_boxes[0]))]))
     else:
-        print ("Skipping non-maxima surpression")
+        print ("Skipping non-maximum surpression")
         nms_dets = all_boxes
 
-    aps = []
+    aps = {}
     for classIndex, className in enumerate(classes):
         if className != '__background__':
             rec, prec, ap = _evaluate_detections(classIndex, nms_dets, all_gt_infos[className], use_07_metric=use_07_metric)
-            aps += [ap]
-            print('AP for {:>15} = {:.4f}'.format(className, ap))
-    print('Mean AP = {:.4f}'.format(np.nanmean(aps)))
+            aps[className] = ap
 
-    return nms_dets
-
+    return aps
 
 def _evaluate_detections(classIndex, all_boxes, gtInfos, overlapThreshold=0.5, use_07_metric=False):
-    """
+    '''
     Top level function that does the PASCAL VOC evaluation.
-
-    [overlapThreshold]: Overlap threshold (default = 0.5)
-    [use_07_metric]: Whether to use VOC07's 11 point AP computation (default False)
-    """
+    '''
 
     # parse detections for this class
     # shape of all_boxes: e.g. 21 classes x 4952 images x 58 rois x 5 coords+score
@@ -65,17 +74,10 @@ def _evaluate_detections(classIndex, all_boxes, gtInfos, overlapThreshold=0.5, u
         use_07_metric=use_07_metric)
     return rec, prec, ap
 
-
-#########################################################################
-# Python evaluation functions (copied/refactored from faster-RCNN)
-##########################################################################
-
 def computeAveragePrecision(recalls, precisions, use_07_metric=False):
-    """ ap = voc_ap(recalls, precisions, [use_07_metric])
-    Compute VOC AP given precision and recall.
-    If use_07_metric is true, uses the
-    VOC 07 11 point method (default:False).
-    """
+    '''
+    Computes VOC AP given precision and recall.
+    '''
     if use_07_metric:
         # 11 point metric
         ap = 0.
@@ -104,12 +106,14 @@ def computeAveragePrecision(recalls, precisions, use_07_metric=False):
     return ap
 
 def _voc_computePrecisionRecallAp(class_recs, confidence, image_ids, BB, ovthresh=0.5, use_07_metric=False):
+    '''
+    Computes precision, recall. and average precision
+    '''
+    if len(BB) == 0:
+        return 0.0, 0.0, 0.0
+
     # sort by confidence
     sorted_ind = np.argsort(-confidence)
-
-    if len(BB) == 0:
-        #import pdb; pdb.set_trace()
-        return 0.0, 0.0, 0.0
 
     BB = BB[sorted_ind, :]
     image_ids = [image_ids[x] for x in sorted_ind]
@@ -158,8 +162,7 @@ def _voc_computePrecisionRecallAp(class_recs, confidence, image_ids, BB, ovthres
     fp = np.cumsum(fp)
     tp = np.cumsum(tp)
     rec = tp / float(npos)
-    # avoid divide by zero in case the first detection matches a difficult
-    # ground truth
+    # avoid divide by zero in case the first detection matches a difficult ground truth
     prec = tp / np.maximum(tp + fp, np.finfo(np.float64).eps)
     ap = computeAveragePrecision(rec, prec, use_07_metric)
     return rec, prec, ap

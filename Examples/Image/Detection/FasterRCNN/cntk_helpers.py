@@ -10,7 +10,7 @@ from PIL.ExifTags import TAGS
 from matplotlib.pyplot import imsave
 from cntk import input_variable, Axis
 from utils.rpn.bbox_transform import bbox_transform_inv
-from utils.rpn.nms_wrapper import applyNonMaximaSuppression
+from utils.nms.nms_wrapper import apply_nms_to_single_image_results
 
 available_font = "arial.ttf"
 try:
@@ -167,8 +167,8 @@ def eval_and_plot_faster_rcnn(eval_model, num_images_to_plot, test_map_file, img
 
         # apply regression and nms to bbox coordinates
         regressed_rois = regress_rois(out_rpn_rois, out_bbox_regr, labels)
-        nmsKeepIndices = applyNonMaximaSuppression(regressed_rois, labels, scores,
-                                                   nms_threshold=nmsThreshold, conf_threshold=decisionThreshold)
+        nmsKeepIndices = apply_nms_to_single_image_resutls(regressed_rois, labels, scores,
+                                                    nms_threshold=nmsThreshold, conf_threshold=decisionThreshold)
 
         img = visualizeResultsFaster(imgPath, labels, scores, regressed_rois, 1000, 1000,
                                      classes, nmsKeepIndices=nmsKeepIndices,
