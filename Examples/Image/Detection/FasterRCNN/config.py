@@ -33,11 +33,12 @@ cfg = __C
 
 __C.CNTK = edict()
 
-__C.CNTK.FAST_MODE = False
+__C.CNTK.FAST_MODE = True
 __C.CNTK.MAKE_MODE = False
 __C.CNTK.TRAIN_E2E = False
 __C.CNTK.DEBUG_OUTPUT = True
 __C.CNTK.USE_MEAN_GRADIENT = False
+__C.CNTK.USE_PYTHON_READER = True
 
 __C.CNTK.DATASET = "Grocery" # "Grocery" or "Pascal"
 __C.CNTK.BASE_MODEL = "AlexNet" # "VGG16" or "AlexNet"
@@ -49,7 +50,7 @@ __C.CNTK.MOMENTUM_PER_MB = 0.9
 # E2E config
 # Caffe Faster R-CNN parameters are: base_lr: 0.001, lr_policy: "step", gamma: 0.1, stepsize: 50000, momentum: 0.9, weight_decay: 0.0005
 # ==> CNTK: lr_per_sample = [0.001] * 10 + [0.0001] * 10 + [0.00001]
-__C.CNTK.MAX_EPOCHS_E2E = 20
+__C.CNTK.E2E_MAX_EPOCHS = 20
 __C.CNTK.E2E_LR_PER_SAMPLE = [0.00001] * 10 + [0.000001] * 10 + [0.000001]
 
 # caffe rpn training: lr = [0.001] * 12 + [0.0001] * 4, momentum = 0.9, weight decay = 0.0005 (cf. stage1_rpn_solver60k80k.pt)
@@ -84,8 +85,8 @@ if __C.CNTK.DATASET == "Grocery":
                         'avocado', 'orange', 'butter', 'champagne', 'eggBox', 'gerkin', 'joghurt', 'ketchup',
                         'orangeJuice', 'onion', 'pepper', 'tomato', 'water', 'milk', 'tabasco', 'mustard')
     __C.CNTK.MAP_FILE_PATH = "Data/Grocery"
-    __C.CNTK.TRAIN_MAP_FILE = "train.imgMap.txt"
-    __C.CNTK.TEST_MAP_FILE = "test.imgMap.txt"
+    __C.CNTK.TRAIN_MAP_FILE = "img_map_file.txt" #""train.imgMap.txt"
+    __C.CNTK.TEST_MAP_FILE = "roi_map_file.txt" #""test.imgMap.txt"
     __C.CNTK.TRAIN_ROI_FILE = "train.GTRois.txt"
     __C.CNTK.TEST_ROI_FILE = "test.GTRois.txt"
     __C.CNTK.NUM_TRAIN_IMAGES = 20
