@@ -85,9 +85,11 @@ if __C.CNTK.DATASET == "Grocery":
                         'avocado', 'orange', 'butter', 'champagne', 'eggBox', 'gerkin', 'joghurt', 'ketchup',
                         'orangeJuice', 'onion', 'pepper', 'tomato', 'water', 'milk', 'tabasco', 'mustard')
     __C.CNTK.MAP_FILE_PATH = "Data/Grocery"
-    __C.CNTK.TRAIN_MAP_FILE = "img_map_file.txt" #""train.imgMap.txt"
-    __C.CNTK.TEST_MAP_FILE = "roi_map_file.txt" #""test.imgMap.txt"
-    __C.CNTK.TRAIN_ROI_FILE = "train.GTRois.txt"
+    #__C.CNTK.TRAIN_MAP_FILE = "train.imgMap.txt"
+    __C.CNTK.TRAIN_MAP_FILE = "img_map_file.txt"
+    __C.CNTK.TEST_MAP_FILE = "test.imgMap.txt"
+    #__C.CNTK.TRAIN_ROI_FILE = "train.GTRois.txt"
+    __C.CNTK.TRAIN_ROI_FILE = "roi_map_file.txt"
     __C.CNTK.TEST_ROI_FILE = "test.GTRois.txt"
     __C.CNTK.NUM_TRAIN_IMAGES = 20
     __C.CNTK.NUM_TEST_IMAGES = 5

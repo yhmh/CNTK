@@ -5,6 +5,7 @@
 # ==============================================================================
 
 from __future__ import print_function
+import pdb
 import numpy as np
 import os, sys
 import argparse
@@ -281,8 +282,6 @@ def train_model_using_cntk_reader(image_input, roi_input, trainer, epochs_to_tra
         while sample_count < epoch_size:  # loop over minibatches in the epoch
             data = minibatch_source.next_minibatch(min(mb_size, epoch_size-sample_count), input_map=input_map)
 
-            import pdb; pdb.set_trace()
-
             trainer.train_minibatch(data)                                    # update model with it
             sample_count += trainer.previous_minibatch_sample_count          # count samples processed so far
             progress_printer.update_with_trainer(trainer, with_metric=True)  # log progress
@@ -384,7 +383,10 @@ def train_faster_rcnn_alternating(debug_output=False):
     feat_norm = image_input - Constant(114)
 
     # For CNTK: convert and scale gt_box coords from x, y, w, h relative to x1, y1, x2, y2 absolute
-    scaled_gt_boxes = convert_gt_boxes(roi_input, image_width, name='roi_input')
+    if cfg["CNTK"].USE_PYTHON_READER:
+        scaled_gt_boxes = alias(roi_input, name='roi_input')
+    else:
+        scaled_gt_boxes = convert_gt_boxes(roi_input, image_width, name='roi_input')
 
     # base image classification model (e.g. VGG16 or AlexNet)
     base_model = load_model(base_model_file)
@@ -611,6 +613,7 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
 
 # The main method trains and evaluates a Fast R-CNN model.
 # If a trained model is already available it is loaded an no training will be performed.
+if __name__ == '__main__':
     if os.path.exists(map_file_path):
         os.chdir(map_file_path)
         if not os.path.exists(os.path.join(abs_path, "Output")):

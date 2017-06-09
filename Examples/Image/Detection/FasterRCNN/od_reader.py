@@ -7,6 +7,7 @@
 import cv2
 import numpy as np
 import os
+import pdb
 
 class ObjectDetectionReader:
     def __init__(self, img_map_file, roi_map_file, max_annotations_per_image,
@@ -54,10 +55,9 @@ class ObjectDetectionReader:
         roi_map_lines = [line for line in roi_map_lines if len(line) > 0]
         roi_sequence_numbers = []
         for roi_line in roi_map_lines:
-            tokens = roi_line.split('\t')
-            roi_sequence_numbers.append(int(tokens[0]))
-            rest = tokens[1]
-            bbox_input = rest[rest.find(' '):]
+            roi_sequence_numbers.append(int(roi_line[:roi_line.find(' ')]))
+            rest = roi_line[roi_line.find(' ')+1:]
+            bbox_input = rest[rest.find(' ')+1:]
             bbox_floats = np.fromstring(bbox_input, dtype=np.float32, sep=' ')
             num_floats = len(bbox_floats)
             assert num_floats % 5 == 0, "Ground truth annotation file is corrupt. Lines must contain 4 coordinates and a label per roi."
@@ -127,6 +127,11 @@ class ObjectDetectionReader:
         xyxy *= scale_factor
         xyxy += (top, left, top, left)
         # not needed since xyxy is just a reference: annotations[:, :4] = xyxy
+        # TODO: do we need to round/floor/ceil xyxy coords?
+        annotations[:, 0] = np.round(annotations[:, 0])
+        annotations[:, 1] = np.round(annotations[:, 1])
+        annotations[:, 2] = np.round(annotations[:, 2])
+        annotations[:, 3] = np.round(annotations[:, 3])
 
         # dims = pad_width, pad_height, scaled_image_width, scaled_image_height, orig_img_width, orig_img_height
         dims = (self._pad_width, self._pad_height, target_w, target_h, img_width, img_height)

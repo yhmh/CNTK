@@ -8,6 +8,7 @@ from cntk.io import UserMinibatchSource, StreamInformation, MinibatchData
 from cntk.core import Value
 from od_reader import ObjectDetectionReader
 import numpy as np
+import pdb
 
 class ObjectDetectionMinibatchSource(UserMinibatchSource):
     def __init__(self, img_map_file, roi_map_file, max_annotations_per_image,
