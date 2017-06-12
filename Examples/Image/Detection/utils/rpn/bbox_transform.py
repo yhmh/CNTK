@@ -73,17 +73,26 @@ def bbox_transform_inv(boxes, deltas):
 
     return pred_boxes
 
-def clip_boxes(boxes, im_shape):
-    """
+def clip_boxes(boxes, im_info):
+    '''
     Clip boxes to image boundaries.
-    """
+    :param boxes: boxes
+    :param im_info: (pad_width, pad_height, scaled_image_width, scaled_image_height, orig_img_width, orig_img_height)
+                    e.g.(1000, 1000, 1000, 600, 500, 300) for an original image of 600x300 that is scaled and padded to 1000x1000
+    '''
 
-    # x1 >= 0
-    boxes[:, 0::4] = np.maximum(np.minimum(boxes[:, 0::4], im_shape[1] - 1), 0)
-    # y1 >= 0
-    boxes[:, 1::4] = np.maximum(np.minimum(boxes[:, 1::4], im_shape[0] - 1), 0)
-    # x2 < im_shape[1]
-    boxes[:, 2::4] = np.maximum(np.minimum(boxes[:, 2::4], im_shape[1] - 1), 0)
-    # y2 < im_shape[0]
-    boxes[:, 3::4] = np.maximum(np.minimum(boxes[:, 3::4], im_shape[0] - 1), 0)
+    padded_wh = im_info[0:2]
+    scaled_wh = im_info[2:4]
+    xy_offset = (padded_wh - scaled_wh) / 2
+    xy_min = xy_offset
+    xy_max = xy_offset + scaled_wh
+
+    # x_min <= x1 <= x_max
+    boxes[:, 0::4] = np.maximum(np.minimum(boxes[:, 0::4], xy_max[0] - 1), xy_min[0])
+    # y_min <= y1 <= y_max
+    boxes[:, 1::4] = np.maximum(np.minimum(boxes[:, 1::4], xy_max[1] - 1), xy_min[1])
+    # x_min <= x2 <= x_max
+    boxes[:, 2::4] = np.maximum(np.minimum(boxes[:, 2::4], xy_max[0] - 1), xy_min[0])
+    # y_min <= y2 <= y_max
+    boxes[:, 3::4] = np.maximum(np.minimum(boxes[:, 3::4], xy_max[1] - 1), xy_min[1])
     return boxes

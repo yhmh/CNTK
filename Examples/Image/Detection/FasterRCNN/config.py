@@ -33,7 +33,7 @@ cfg = __C
 
 __C.CNTK = edict()
 
-__C.CNTK.FAST_MODE = True
+__C.CNTK.FAST_MODE = False
 __C.CNTK.MAKE_MODE = False
 __C.CNTK.TRAIN_E2E = False
 __C.CNTK.DEBUG_OUTPUT = True
@@ -54,12 +54,12 @@ __C.CNTK.E2E_MAX_EPOCHS = 20
 __C.CNTK.E2E_LR_PER_SAMPLE = [0.00001] * 10 + [0.000001] * 10 + [0.000001]
 
 # caffe rpn training: lr = [0.001] * 12 + [0.0001] * 4, momentum = 0.9, weight decay = 0.0005 (cf. stage1_rpn_solver60k80k.pt)
-__C.CNTK.RPN_EPOCHS = 4
+__C.CNTK.RPN_EPOCHS = 6
 __C.CNTK.RPN_LR_PER_SAMPLE = [0.002] * 4 + [0.001] * 4 + [0.0005] * 4 + [0.0001] * 4
 
 # caffe frcn training: lr = [0.001] * 6 + [0.0001] * 2, momentum = 0.9, weight decay = 0.0005 (cf. stage1_fast_rcnn_solver30k40k.pt)
 __C.CNTK.FRCN_EPOCHS = 20
-__C.CNTK.FRCN_LR_PER_SAMPLE = [0.00002] * 8 + [0.00001] * 6 + [0.000001] * 6
+__C.CNTK.FRCN_LR_PER_SAMPLE = [0.00001] * 8 + [0.000005] * 6 + [0.000001] * 6
 
 __C.CNTK.INPUT_ROIS_PER_IMAGE = 50
 __C.CNTK.IMAGE_WIDTH = 1000
@@ -75,6 +75,7 @@ __C.CNTK.DRAW_UNREGRESSED_ROIS = True
 
 __C.CNTK.FEATURE_STREAM_NAME = 'features'
 __C.CNTK.ROI_STREAM_NAME = 'roiAndLabel'
+__C.CNTK.DIMS_STREAM_NAME = 'dims'
 
 
 #
@@ -85,11 +86,13 @@ if __C.CNTK.DATASET == "Grocery":
                         'avocado', 'orange', 'butter', 'champagne', 'eggBox', 'gerkin', 'joghurt', 'ketchup',
                         'orangeJuice', 'onion', 'pepper', 'tomato', 'water', 'milk', 'tabasco', 'mustard')
     __C.CNTK.MAP_FILE_PATH = "Data/Grocery"
-    #__C.CNTK.TRAIN_MAP_FILE = "train.imgMap.txt"
-    __C.CNTK.TRAIN_MAP_FILE = "img_map_file.txt"
+    if __C.CNTK.USE_PYTHON_READER:
+        __C.CNTK.TRAIN_MAP_FILE = "img_map_file.txt"
+        __C.CNTK.TRAIN_ROI_FILE = "roi_map_file.txt"
+    else:
+        __C.CNTK.TRAIN_MAP_FILE = "train.imgMap.txt"
+        __C.CNTK.TRAIN_ROI_FILE = "train.GTRois.txt"
     __C.CNTK.TEST_MAP_FILE = "test.imgMap.txt"
-    #__C.CNTK.TRAIN_ROI_FILE = "train.GTRois.txt"
-    __C.CNTK.TRAIN_ROI_FILE = "roi_map_file.txt"
     __C.CNTK.TEST_ROI_FILE = "test.GTRois.txt"
     __C.CNTK.NUM_TRAIN_IMAGES = 20
     __C.CNTK.NUM_TEST_IMAGES = 5

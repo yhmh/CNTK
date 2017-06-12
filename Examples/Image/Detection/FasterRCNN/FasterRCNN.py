@@ -51,7 +51,9 @@ mb_size = 1
 image_width = cfg["CNTK"].IMAGE_WIDTH
 image_height = cfg["CNTK"].IMAGE_HEIGHT
 num_channels = 3
-im_info = cntk.constant([image_width, image_height, 1], (3,))
+# im_info = cntk.constant([image_width, image_height, 1], (3,)) # !!! use dims_input instead!
+# dims_input - (pad_width, pad_height, scaled_image_width, scaled_image_height, orig_img_width, orig_img_height)
+dims_input_const = cntk.constant([image_width, image_height, image_width, image_height, image_width, image_height], (1,6)) # !!! use dims_input instead!
 
 globalvars = {}
 globalvars['output_path'] = os.path.join(abs_path, "Output")
@@ -182,7 +184,7 @@ def create_fast_rcnn_predictor(conv_out, rois, fc_layers):
     return cls_score, bbox_pred
 
 # Defines the Faster R-CNN network model for detecting objects in images
-def create_faster_rcnn_predictor(features, scaled_gt_boxes):
+def create_faster_rcnn_predictor(features, scaled_gt_boxes, dims_input):
     # Load the pre-trained classification net and clone layers
     base_model = load_model(base_model_file)
     conv_layers = clone_model(base_model, [feature_node_name], [last_conv_node_name], clone_method=CloneMethod.freeze)
@@ -193,7 +195,7 @@ def create_faster_rcnn_predictor(features, scaled_gt_boxes):
     conv_out = conv_layers(feat_norm)
 
     # RPN
-    rpn_rois, rpn_losses = create_rpn(conv_out, scaled_gt_boxes, im_info,
+    rpn_rois, rpn_losses = create_rpn(conv_out, scaled_gt_boxes, dims_input,
                                       proposal_layer_param_string=cfg["CNTK"].PROPOSAL_LAYER_PARAMS)
     rois, label_targets, bbox_targets, bbox_inside_weights = \
         create_proposal_target_layer(rpn_rois, scaled_gt_boxes, num_classes=num_classes)
@@ -211,21 +213,22 @@ def create_faster_rcnn_predictor(features, scaled_gt_boxes):
 
     return cls_score, loss, pred_error
 
-def create_eval_model(model, image_input):
+def create_eval_model(model, image_input, dims_input):
     # modify Faster RCNN model by excluding target layers and losses
     feature_node = find_by_name(model, feature_node_name)
     conv_node = find_by_name(model, last_conv_node_name)
+    dims_input_node = find_by_name(model, "dims_input")
     rpn_roi_node = find_by_name(model, "rpn_rois")
     rpn_target_roi_node = find_by_name(model, "rpn_target_rois")
     cls_score_node = find_by_name(model, "cls_score")
     bbox_pred_node = find_by_name(model, "bbox_regr")
 
     conv_rpn_layers = combine([conv_node.owner, rpn_roi_node.owner])\
-        .clone(CloneMethod.freeze, {feature_node: placeholder()})
+        .clone(CloneMethod.freeze, {feature_node: placeholder(), dims_input_node: placeholder()})
     roi_fc_layers = combine([cls_score_node.owner, bbox_pred_node.owner])\
         .clone(CloneMethod.clone, {conv_node: placeholder(), rpn_target_roi_node: placeholder()})
 
-    conv_rpn_net = conv_rpn_layers(image_input)
+    conv_rpn_net = conv_rpn_layers(image_input, dims_input)
     conv_out = conv_rpn_net.outputs[0]
     rpn_rois = conv_rpn_net.outputs[1]
 
@@ -263,9 +266,9 @@ def train_model(image_input, roi_input, dims_input, loss, pred_error,
     if cfg["CNTK"].USE_PYTHON_READER:
         train_model_using_python_reader(image_input, roi_input, dims_input, trainer, epochs_to_train)
     else:
-        train_model_using_cntk_reader(image_input, roi_input, trainer, epochs_to_train)
+        train_model_using_cntk_reader(image_input, roi_input, dims_input, trainer, epochs_to_train)
 
-def train_model_using_cntk_reader(image_input, roi_input, trainer, epochs_to_train):
+def train_model_using_cntk_reader(image_input, roi_input, dims_input, trainer, epochs_to_train):
     # Create the minibatch source
     minibatch_source = create_mb_source(globalvars['train_map_file'], globalvars['train_roi_file'],
         image_height, image_width, num_channels, cfg["CNTK"].INPUT_ROIS_PER_IMAGE)
@@ -273,7 +276,8 @@ def train_model_using_cntk_reader(image_input, roi_input, trainer, epochs_to_tra
     # define mapping from reader streams to network inputs
     input_map = {
         image_input: minibatch_source[cfg["CNTK"].FEATURE_STREAM_NAME],
-        roi_input: minibatch_source[cfg["CNTK"].ROI_STREAM_NAME]
+        roi_input: minibatch_source[cfg["CNTK"].ROI_STREAM_NAME],
+        dims_input: dims_input_const
     }
 
     progress_printer = ProgressPrinter(tag='Training', num_epochs=epochs_to_train, gen_heartbeat=True)
@@ -323,9 +327,11 @@ def train_model_using_python_reader(image_input, roi_input, dims_input, trainer,
 
 # Trains a Faster R-CNN model end-to-end
 def train_faster_rcnn_e2e(debug_output=False):
+    # !!! NOTE: E2E NEEDS TO BE ADAPTED TO WORK AGAIN WITH THE LATEST CHANGES --> use alternating training scheme
     # Input variables denoting features and labeled ground truth rois (as 5-tuples per roi)
     image_input = input_variable((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()], name=feature_node_name)
     roi_input = input_variable((cfg["CNTK"].INPUT_ROIS_PER_IMAGE, 5), dynamic_axes=[Axis.default_batch_axis()])
+    dims_input = input_variable((6), dynamic_axes=[Axis.default_batch_axis()])
 
     # For CNTK: convert and scale gt_box coords from x, y, w, h relative to x1, y1, x2, y2 absolute
     scaled_gt_boxes = convert_gt_boxes(roi_input, image_width, name='roi_input')
@@ -341,7 +347,7 @@ def train_faster_rcnn_e2e(debug_output=False):
     lr_schedule = learning_rate_schedule(cfg["CNTK"].E2E_LR_PER_SAMPLE, unit=UnitType.sample)
     mm_schedule = momentum_schedule(cfg["CNTK"].MOMENTUM_PER_MB)
 
-    train_model(image_input, roi_input, None, loss, pred_error,
+    train_model(image_input, roi_input, dims_input, loss, pred_error,
                 lr_schedule, mm_schedule, cfg["CNTK"].L2_REG_WEIGHT, cfg["CNTK"].E2E_MAX_EPOCHS)
     return loss
 
@@ -379,7 +385,8 @@ def train_faster_rcnn_alternating(debug_output=False):
     image_input = input_variable((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()],
                                  name=feature_node_name)
     roi_input = input_variable((cfg["CNTK"].INPUT_ROIS_PER_IMAGE, 5), dynamic_axes=[Axis.default_batch_axis()])
-    dims_input = input_variable((4), dynamic_axes=[Axis.default_batch_axis()])
+    dims_input = input_variable((6), dynamic_axes=[Axis.default_batch_axis()])
+    dims_node = alias(dims_input, name='dims_input')
     feat_norm = image_input - Constant(114)
 
     # For CNTK: convert and scale gt_box coords from x, y, w, h relative to x1, y1, x2, y2 absolute
@@ -421,7 +428,7 @@ def train_faster_rcnn_alternating(debug_output=False):
         #conv_out = conv_layers(feat_norm)
 
         # RPN and losses
-        rpn_rois, rpn_losses = create_rpn(conv_out, scaled_gt_boxes, im_info,
+        rpn_rois, rpn_losses = create_rpn(conv_out, scaled_gt_boxes, dims_node,
                                           proposal_layer_param_string=cfg["CNTK"].PROPOSAL_LAYER_PARAMS)
         stage1_rpn_network = combine([rpn_rois, rpn_losses])
 
@@ -452,8 +459,9 @@ def train_faster_rcnn_alternating(debug_output=False):
         # conv_out = conv_layers(feat_norm)
 
         # RPN
-        rpn = clone_model(stage1_rpn_network, [last_conv_node_name, "roi_input"], ["rpn_rois", "rpn_losses"], CloneMethod.freeze)
-        rpn_net = rpn(conv_out, scaled_gt_boxes)
+        rpn = clone_model(stage1_rpn_network, [last_conv_node_name, "roi_input", "dims_input"], ["rpn_rois", "rpn_losses"], CloneMethod.freeze)
+        ## TODO: !!! the order of the inputs here is different compared to the order of the names given to 'clone_model' !!!
+        rpn_net = rpn(conv_out, dims_node, scaled_gt_boxes)
         rpn_rois = rpn_net.outputs[0]
         rpn_losses = rpn_net.outputs[1] # required for training rpn in stage 2
 
@@ -488,8 +496,9 @@ def train_faster_rcnn_alternating(debug_output=False):
         conv_out = conv_layers(image_input)
 
         # RPN and losses
-        rpn = clone_model(stage1_rpn_network, [last_conv_node_name, "roi_input"], ["rpn_rois", "rpn_losses"], CloneMethod.clone)
-        rpn_net = rpn(conv_out, scaled_gt_boxes)
+        rpn = clone_model(stage1_rpn_network, [last_conv_node_name, "roi_input", "dims_input"], ["rpn_rois", "rpn_losses"], CloneMethod.clone)
+        ## TODO: !!! the order of the inputs here is different compared to the order of the names given to 'clone_model' !!!
+        rpn_net = rpn(conv_out, dims_node, scaled_gt_boxes)
         rpn_rois = rpn_net.outputs[0]
         rpn_losses = rpn_net.outputs[1]
         stage2_rpn_network = combine([rpn_rois, rpn_losses])
@@ -512,8 +521,8 @@ def train_faster_rcnn_alternating(debug_output=False):
         conv_out = conv_layers(image_input)
 
         # RPN
-        rpn = clone_model(stage2_rpn_network, [last_conv_node_name], ["rpn_rois"], CloneMethod.freeze)
-        rpn_rois = rpn(conv_out)
+        rpn = clone_model(stage2_rpn_network, [last_conv_node_name, "dims_input"], ["rpn_rois"], CloneMethod.freeze)
+        rpn_rois = rpn(conv_out, dims_node)
 
         # Fast RCNN and losses
         frcn = clone_model(stage1_frcn_network, [last_conv_node_name, "rpn_rois", "roi_input"],
@@ -531,18 +540,38 @@ def train_faster_rcnn_alternating(debug_output=False):
 
 def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
     image_input = input_variable((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()], name=feature_node_name)
-    roi_input   = input_variable((cfg["CNTK"].INPUT_ROIS_PER_IMAGE, 5), dynamic_axes=[Axis.default_batch_axis()])
-    frcn_eval = eval_model(image_input)
+    roi_input = input_variable((cfg["CNTK"].INPUT_ROIS_PER_IMAGE, 5), dynamic_axes=[Axis.default_batch_axis()])
+    dims_input = input_variable((6), dynamic_axes=[Axis.default_batch_axis()])
+    frcn_eval = eval_model(image_input, dims_input)
 
     # Create the minibatch source
-    minibatch_source = create_mb_source(img_map_file, roi_map_file,
-        image_height, image_width, num_channels, cfg["CNTK"].INPUT_ROIS_PER_IMAGE, randomize=False)
+    if cfg['CNTK'].USE_PYTHON_READER:
+        minibatch_source = ObjectDetectionMinibatchSource(
+            globalvars['train_map_file'], globalvars['train_roi_file'],
+            max_annotations_per_image=cfg["CNTK"].INPUT_ROIS_PER_IMAGE,
+            pad_width=image_width, pad_height=image_height, pad_value=114)
 
-    # define mapping from reader streams to network inputs
-    input_map = {
-        image_input: minibatch_source[cfg["CNTK"].FEATURE_STREAM_NAME],
-        roi_input: minibatch_source[cfg["CNTK"].ROI_STREAM_NAME]
-    }
+        # define mapping from reader streams to network inputs
+        input_map = {
+            minibatch_source.image_si: image_input,
+            minibatch_source.roi_si: roi_input,
+            minibatch_source.dims_si: dims_input
+        }
+    else:
+        # TODO: needs to be provide dims input as well, does not work anymore currently
+        minibatch_source = create_mb_source(img_map_file, roi_map_file,
+            image_height, image_width, num_channels, cfg["CNTK"].INPUT_ROIS_PER_IMAGE, randomize=False)
+
+        # define mapping from reader streams to network inputs
+        input_map = {
+            image_input: minibatch_source[cfg["CNTK"].FEATURE_STREAM_NAME],
+            roi_input: minibatch_source[cfg["CNTK"].ROI_STREAM_NAME],
+            dims_input: minibatch_source[cfg["CNTK"].DIMS_STREAM_NAME]
+        }
+
+    img_key = "features"
+    roi_key = "[50 x 5]"
+    dims_key = "[6]"
 
     # all detections are collected into:
     #    all_boxes[cls][image] = N x 5 array of detections in
@@ -554,10 +583,10 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
     all_gt_infos = {key: [] for key in classes}
     for img_i in range(0, num_test_images):
         mb_data = minibatch_source.next_minibatch(1, input_map=input_map)
-        rkeys = [k for k in mb_data if "features" not in str(k)]
-        gt_row = mb_data[rkeys[0]].asarray()[0,0,:]
-        all_gt_boxes = gt_row.reshape((cfg["CNTK"].INPUT_ROIS_PER_IMAGE, 5))
-        all_gt_boxes = all_gt_boxes[np.where(all_gt_boxes[:,-1] > 0)]
+        rkeys = [k for k in mb_data if roi_key in str(k)]
+        gt_row = mb_data[rkeys[0]].asarray()
+        #all_gt_boxes = gt_row.reshape((cfg["CNTK"].INPUT_ROIS_PER_IMAGE, 5))
+        all_gt_boxes = gt_row[np.where(gt_row[:,-1] > 0)]
 
         # transform from (x, y, w, h) relative to (x_min, y_min, x_max, y_max) absolute
         gt_coords = all_gt_boxes[:, :4]
@@ -579,8 +608,9 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
                                            'difficult': [False] * len(cls_gt_boxes),
                                            'det': [False] * len(cls_gt_boxes)})
 
-        fkeys = [k for k in mb_data if "features" in str(k)]
-        output = frcn_eval.eval({fkeys[0]: mb_data[fkeys[0]]})
+        fkeys = [k for k in mb_data if img_key in str(k)]
+        dkeys = [k for k in mb_data if dims_key in str(k)]
+        output = frcn_eval.eval({fkeys[0]: mb_data[fkeys[0]], dkeys[0]: mb_data[dkeys[0]]})
         out_dict = dict([(k.name, k) for k in output])
         out_cls_pred = output[out_dict['cls_pred']][0]                      # (300, 17)
         out_rpn_rois = output[out_dict['rpn_rois']][0]
@@ -599,8 +629,8 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
             coords_score_label_for_cls = coords_score_label[np.where(coords_score_label[:,-1] == cls_j)]
             all_boxes[cls_j][img_i] = coords_score_label_for_cls[:,:-1].astype(np.float32, copy=False)
 
-        if img_i % 100 == 0:
-            print("Processed {} samples".format(img_i))
+        if (img_i+1) % 100 == 0:
+            print("Processed {} samples".format(img_i+1))
 
     # calculate mAP
     aps = evaluate_detections(all_boxes, all_gt_infos, classes, nms_threshold=cfg["CNTK"].RESULTS_NMS_THRESHOLD)
@@ -639,7 +669,8 @@ if __name__ == '__main__':
 
         # create and store eval model
         img_input = input_variable((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()], name=feature_node_name)
-        eval_model = create_eval_model(trained_model, img_input)
+        dims_input = input_variable((6), dynamic_axes=[Axis.default_batch_axis()], name='dims_input')
+        eval_model = create_eval_model(trained_model, img_input, dims_input)
         eval_model.save(model_path)
         if cfg["CNTK"].DEBUG_OUTPUT:
             plot(eval_model, os.path.join(globalvars['output_path'], "graph_frcn_eval_{}_{}.{}"

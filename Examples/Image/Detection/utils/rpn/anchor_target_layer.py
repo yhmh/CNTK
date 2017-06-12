@@ -19,7 +19,7 @@ try:
 except ImportError:
     from utils.default_config import cfg
 
-DEBUG = False
+DEBUG = True
 
 class AnchorTargetLayer(UserFunction):
     '''
@@ -99,7 +99,7 @@ class AnchorTargetLayer(UserFunction):
         # GT boxes (x1, y1, x2, y2, label)
         gt_boxes = bottom[1][0,:]
         # im_info
-        im_info = bottom[2]
+        im_info = bottom[2][0]
 
         # remove zero padded ground truth boxes
         keep = np.where(
@@ -110,8 +110,11 @@ class AnchorTargetLayer(UserFunction):
 
         if DEBUG:
             print ('')
+            # im_info = (pad_width, pad_height, scaled_image_width, scaled_image_height, orig_img_width, orig_img_height)
+            # e.g.(1000, 1000, 1000, 600, 500, 300) for an original image of 600x300 that is scaled and padded to 1000x1000
             print ('im_size: ({}, {})'.format(im_info[0], im_info[1]))
-            print ('scale: {}'.format(im_info[2]))
+            print ('scaled im_size: ({}, {})'.format(im_info[2], im_info[3]))
+            print ('original im_size: ({}, {})'.format(im_info[4], im_info[5]))
             print ('height, width: ({}, {})'.format(height, width))
             print ('rpn: gt_boxes.shape', gt_boxes.shape)
             #print ('rpn: gt_boxes', gt_boxes)
@@ -134,11 +137,17 @@ class AnchorTargetLayer(UserFunction):
         total_anchors = int(K * A)
 
         # only keep anchors inside the image
+        padded_wh = im_info[0:2]
+        scaled_wh = im_info[2:4]
+        xy_offset = (padded_wh - scaled_wh) / 2
+        xy_min = xy_offset
+        xy_max = xy_offset + scaled_wh
+
         inds_inside = np.where(
-            (all_anchors[:, 0] >= -self._allowed_border) &
-            (all_anchors[:, 1] >= -self._allowed_border) &
-            (all_anchors[:, 2] < im_info[1] + self._allowed_border) &  # width
-            (all_anchors[:, 3] < im_info[0] + self._allowed_border)    # height
+            (all_anchors[:, 0] >= xy_min[0] - self._allowed_border) &
+            (all_anchors[:, 1] >= xy_min[1] - self._allowed_border) &
+            (all_anchors[:, 2] < xy_max[0] + self._allowed_border) &  # width
+            (all_anchors[:, 3] < xy_max[1] + self._allowed_border)    # height
         )[0]
 
         if DEBUG:

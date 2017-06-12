@@ -33,7 +33,9 @@ def create_rpn(conv_out, scaled_gt_boxes, im_info, add_loss_functions=True,
     Args:
         conv_out:        The convolutional feature map, i.e. the output of the conv layers from the pretrained classification network
         scaled_gt_boxes: The ground truth boxes as (x1, y1, x2, y2, label). Coordinates are absolute pixels wrt. the input image.
-        im_info:         (image_widht, image_height, image_scale) as CNTK variable or constant
+        im_info:         A CNTK variable or constant containing
+                         (pad_width, pad_height, scaled_image_width, scaled_image_height, orig_img_width, orig_img_height)
+                         e.g. (1000, 1000, 1000, 600, 500, 300) for an original image of 600x300 that is scaled and padded to 1000x1000
         add_loss_functions: If set to True rpn_losses will be returned, otherwise None is returned for the losses
         proposal_layer_param_string: A yaml parameter string that is passed to the proposal layer.
 

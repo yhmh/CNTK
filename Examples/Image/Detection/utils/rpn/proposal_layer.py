@@ -86,11 +86,14 @@ class ProposalLayer(UserFunction):
         # the second set are the fg probs, which we want
         scores = bottom[0][:, self._num_anchors:, :, :]
         bbox_deltas = bottom[1]
-        im_info = bottom[2]
+        im_info = bottom[2][0]
 
         if DEBUG:
+            # im_info = (pad_width, pad_height, scaled_image_width, scaled_image_height, orig_img_width, orig_img_height)
+            # e.g.(1000, 1000, 1000, 600, 500, 300) for an original image of 600x300 that is scaled and padded to 1000x1000
             print ('im_size: ({}, {})'.format(im_info[0], im_info[1]))
-            print ('scale: {}'.format(im_info[2]))
+            print ('scaled im_size: ({}, {})'.format(im_info[2], im_info[3]))
+            print ('original im_size: ({}, {})'.format(im_info[4], im_info[5]))
 
         # 1. Generate proposals from bbox deltas and shifted anchors
         height, width = scores.shape[-2:]
@@ -137,11 +140,12 @@ class ProposalLayer(UserFunction):
         proposals = bbox_transform_inv(anchors, bbox_deltas)
 
         # 2. clip predicted boxes to image
-        proposals = clip_boxes(proposals, im_info[:2])
+        proposals = clip_boxes(proposals, im_info)
 
         # 3. remove predicted boxes with either height or width < threshold
-        # (NOTE: convert min_size to input image scale stored in im_info[2])
-        keep = _filter_boxes(proposals, min_size * im_info[2])
+        # (NOTE: convert min_size to input image scale. Original size = im_info[4:6], scaled size = im_info[2:4])
+        cntk_image_scale = im_info[2] / im_info[4]
+        keep = _filter_boxes(proposals, min_size * cntk_image_scale)
         proposals = proposals[keep, :]
         scores = scores[keep]
 

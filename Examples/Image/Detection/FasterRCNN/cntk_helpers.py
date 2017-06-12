@@ -115,7 +115,8 @@ def load_resize_and_pad(image_path, width, height, pad_value=114):
     # transpose(2,0,1) converts the image to the HWC format which CNTK accepts
     model_arg_rep = np.ascontiguousarray(np.array(resized_with_pad, dtype=np.float32).transpose(2, 0, 1))
 
-    return resized_with_pad, model_arg_rep
+    dims = (width, height, target_w, target_h, img_width, img_height)
+    return resized_with_pad, model_arg_rep, dims
 
 def regress_rois(roi_proposals, roi_regression_factors, labels):
     for i in range(len(labels)):
@@ -141,15 +142,18 @@ def eval_and_plot_faster_rcnn(eval_model, num_images_to_plot, test_map_file, img
 
     # prepare model
     image_input = input_variable(img_shape, dynamic_axes=[Axis.default_batch_axis()], name=feature_node_name)
-    frcn_eval = eval_model(image_input)
+    dims_input = input_variable((1,6), dynamic_axes=[Axis.default_batch_axis()], name='dims_input')
+    frcn_eval = eval_model(image_input, dims_input)
 
+    #dims_input_const = cntk.constant([image_width, image_height, image_width, image_height, image_width, image_height], (1, 6))
     print("Plotting results from Faster R-CNN model for %s images." % num_images_to_plot)
     for i in range(0, num_images_to_plot):
         imgPath = img_file_names[i]
 
         # evaluate single image
-        _, cntk_img_input = load_resize_and_pad(imgPath, img_shape[2], img_shape[1])
-        output = frcn_eval.eval({frcn_eval.arguments[0]: [cntk_img_input]})
+        _, cntk_img_input, dims = load_resize_and_pad(imgPath, img_shape[2], img_shape[1])
+        dims_input_const = cntk.constant(np.array(dims, dtype=np.float32), (1, 6))
+        output = frcn_eval.eval({frcn_eval.arguments[0]: [cntk_img_input], frcn_eval.arguments[0]: dims_input_const})
 
         out_dict = dict([(k.name, k) for k in output])
         out_cls_pred = output[out_dict['cls_pred']][0]
