@@ -12,7 +12,8 @@ import argparse
 import cntk
 from cntk import Trainer, UnitType, load_model, user_function, Axis, input_variable, parameter, times, combine, relu, \
     softmax, roipooling, reduce_sum, slice, splice, reshape, plus, CloneMethod, minus, element_times, alias, Communicator
-from cntk.io import MinibatchSource, ImageDeserializer, CTFDeserializer, StreamDefs, StreamDef, TraceLevel
+from cntk.core import Value
+from cntk.io import MinibatchSource, ImageDeserializer, CTFDeserializer, StreamDefs, StreamDef, TraceLevel, MinibatchData
 from cntk.io.transforms import scale
 from cntk.initializer import glorot_uniform, normal
 from cntk.layers import placeholder, Constant, Sequential
@@ -53,7 +54,8 @@ image_height = cfg["CNTK"].IMAGE_HEIGHT
 num_channels = 3
 # im_info = cntk.constant([image_width, image_height, 1], (3,)) # !!! use dims_input instead!
 # dims_input - (pad_width, pad_height, scaled_image_width, scaled_image_height, orig_img_width, orig_img_height)
-dims_input_const = cntk.constant([image_width, image_height, image_width, image_height, image_width, image_height], (1,6)) # !!! use dims_input instead!
+dims_input_const = MinibatchData(Value(batch=np.asarray(
+    [image_width, image_height, image_width, image_height, image_width, image_height], dtype=np.float32)), 1, 1, False)
 
 globalvars = {}
 globalvars['output_path'] = os.path.join(abs_path, "Output")
@@ -277,7 +279,6 @@ def train_model_using_cntk_reader(image_input, roi_input, dims_input, trainer, e
     input_map = {
         image_input: minibatch_source[cfg["CNTK"].FEATURE_STREAM_NAME],
         roi_input: minibatch_source[cfg["CNTK"].ROI_STREAM_NAME],
-        dims_input: dims_input_const
     }
 
     progress_printer = ProgressPrinter(tag='Training', num_epochs=epochs_to_train, gen_heartbeat=True)
@@ -285,6 +286,7 @@ def train_model_using_cntk_reader(image_input, roi_input, dims_input, trainer, e
         sample_count = 0
         while sample_count < epoch_size:  # loop over minibatches in the epoch
             data = minibatch_source.next_minibatch(min(mb_size, epoch_size-sample_count), input_map=input_map)
+            data[dims_input] = dims_input_const
 
             trainer.train_minibatch(data)                                    # update model with it
             sample_count += trainer.previous_minibatch_sample_count          # count samples processed so far
@@ -558,7 +560,6 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
             minibatch_source.dims_si: dims_input
         }
     else:
-        # TODO: needs to be provide dims input as well, does not work anymore currently
         minibatch_source = create_mb_source(img_map_file, roi_map_file,
             image_height, image_width, num_channels, cfg["CNTK"].INPUT_ROIS_PER_IMAGE, randomize=False)
 
@@ -566,7 +567,6 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
         input_map = {
             image_input: minibatch_source[cfg["CNTK"].FEATURE_STREAM_NAME],
             roi_input: minibatch_source[cfg["CNTK"].ROI_STREAM_NAME],
-            dims_input: minibatch_source[cfg["CNTK"].DIMS_STREAM_NAME]
         }
 
     img_key = "features"
@@ -583,9 +583,12 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
     all_gt_infos = {key: [] for key in classes}
     for img_i in range(0, num_test_images):
         mb_data = minibatch_source.next_minibatch(1, input_map=input_map)
+        if not cfg['CNTK'].USE_PYTHON_READER:
+            mb_data[dims_input] = dims_input_const
+
         rkeys = [k for k in mb_data if roi_key in str(k)]
         gt_row = mb_data[rkeys[0]].asarray()
-        #all_gt_boxes = gt_row.reshape((cfg["CNTK"].INPUT_ROIS_PER_IMAGE, 5))
+        gt_row = gt_row.reshape((cfg["CNTK"].INPUT_ROIS_PER_IMAGE, 5))
         all_gt_boxes = gt_row[np.where(gt_row[:,-1] > 0)]
 
         # transform from (x, y, w, h) relative to (x_min, y_min, x_max, y_max) absolute

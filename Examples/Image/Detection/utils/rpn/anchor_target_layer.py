@@ -19,7 +19,7 @@ try:
 except ImportError:
     from utils.default_config import cfg
 
-DEBUG = True
+DEBUG = False
 
 class AnchorTargetLayer(UserFunction):
     '''
