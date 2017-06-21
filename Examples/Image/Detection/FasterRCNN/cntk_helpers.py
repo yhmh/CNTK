@@ -8,6 +8,7 @@ import cv2, copy, textwrap
 from PIL import Image, ImageFont, ImageDraw
 from PIL.ExifTags import TAGS
 from matplotlib.pyplot import imsave
+import cntk
 from cntk import input_variable, Axis
 from utils.rpn.bbox_transform import bbox_transform_inv
 from utils.nms.nms_wrapper import apply_nms_to_single_image_results
@@ -152,8 +153,11 @@ def eval_and_plot_faster_rcnn(eval_model, num_images_to_plot, test_map_file, img
 
         # evaluate single image
         _, cntk_img_input, dims = load_resize_and_pad(imgPath, img_shape[2], img_shape[1])
-        dims_input_const = cntk.constant(np.array(dims, dtype=np.float32), (1, 6))
-        output = frcn_eval.eval({frcn_eval.arguments[0]: [cntk_img_input], frcn_eval.arguments[0]: dims_input_const})
+
+
+        dims_input = np.array(dims, dtype=np.float32)
+        dims_input.shape = (1,) + dims_input.shape
+        output = frcn_eval.eval({frcn_eval.arguments[0]: [cntk_img_input], frcn_eval.arguments[1]: dims_input})
 
         out_dict = dict([(k.name, k) for k in output])
         out_cls_pred = output[out_dict['cls_pred']][0]
@@ -171,7 +175,7 @@ def eval_and_plot_faster_rcnn(eval_model, num_images_to_plot, test_map_file, img
 
         # apply regression and nms to bbox coordinates
         regressed_rois = regress_rois(out_rpn_rois, out_bbox_regr, labels)
-        nmsKeepIndices = apply_nms_to_single_image_resutls(regressed_rois, labels, scores,
+        nmsKeepIndices = apply_nms_to_single_image_results(regressed_rois, labels, scores,
                                                     nms_threshold=nmsThreshold, conf_threshold=decisionThreshold)
 
         img = visualizeResultsFaster(imgPath, labels, scores, regressed_rois, 1000, 1000,

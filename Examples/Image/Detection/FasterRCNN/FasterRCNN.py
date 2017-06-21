@@ -162,15 +162,8 @@ def clone_model(base_model, from_node_names, to_node_names, clone_method):
     return cloned_net
 
 def create_fast_rcnn_predictor(conv_out, rois, fc_layers):
-    # for the roipooling layer we convert and scale roi coords back to x, y, w, h relative from x1, y1, x2, y2 absolute
-    roi_xy1 = slice(rois, 1, 0, 2)
-    roi_xy2 = slice(rois, 1, 2, 4)
-    roi_wh = minus(roi_xy2, roi_xy1)
-    roi_xywh = splice(roi_xy1, roi_wh, axis=1)
-    scaled_rois = element_times(roi_xywh, (1.0 / image_width))
-
     # RCNN
-    roi_out = roipooling(conv_out, scaled_rois, (roi_dim, roi_dim))
+    roi_out = roipooling(conv_out, rois, cntk.MAX_POOLING, (roi_dim, roi_dim), spatial_scale=1/16.0)
     fc_out = fc_layers(roi_out)
 
     # prediction head

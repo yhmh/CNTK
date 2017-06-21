@@ -53,7 +53,7 @@ def apply_nms_to_single_image_results(coords, labels, scores, nms_threshold=0.5,
         allIndices.append(indices)
 
     # call nms
-    _, nmsKeepIndicesList = apply_nms(nmsRects, nms_threshold, conf_threshold)
+    _, nmsKeepIndicesList = apply_nms_to_test_set_results(nmsRects, nms_threshold, conf_threshold)
 
     # map back to original roi indices
     nmsKeepIndices = []
