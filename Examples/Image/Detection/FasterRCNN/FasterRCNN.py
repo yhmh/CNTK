@@ -542,9 +542,9 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
     # Create the minibatch source
     if cfg['CNTK'].USE_PYTHON_READER:
         minibatch_source = ObjectDetectionMinibatchSource(
-            globalvars['train_map_file'], globalvars['train_roi_file'],
+            img_map_file, roi_map_file,
             max_annotations_per_image=cfg["CNTK"].INPUT_ROIS_PER_IMAGE,
-            pad_width=image_width, pad_height=image_height, pad_value=114)
+            pad_width=image_width, pad_height=image_height, pad_value=114, randomize=False)
 
         # define mapping from reader streams to network inputs
         input_map = {

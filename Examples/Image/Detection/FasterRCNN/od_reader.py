@@ -18,8 +18,12 @@ class ObjectDetectionReader:
         self._randomize = randomize
         self._img_file_paths = []
         self._gt_annotations = []
+        self._img_stats = []
 
         self._num_images = self._parse_map_files(img_map_file, roi_map_file, max_annotations_per_image)
+        for i in range(self._num_images):
+            self._scale_and_pad_annotations(i)
+
         self._reading_order = None
         self._reading_index = -1
         
@@ -93,14 +97,14 @@ class ObjectDetectionReader:
 
         self._reading_index = 0
 
-    def _load_resize_and_pad(self, index):
+    def _scale_and_pad_annotations(self, index):
         image_path = self._img_file_paths[index]
         annotations = self._gt_annotations[index]
 
         img = cv2.imread(image_path)
         img_width = len(img[0])
         img_height = len(img)
-    
+
         do_scale_w = img_width > img_height
         target_w = self._pad_width
         target_h = self._pad_height
@@ -110,28 +114,38 @@ class ObjectDetectionReader:
         else:
             scale_factor = float(self._pad_height) / float(img_height)
             target_w = int(np.round(img_width * scale_factor))
-    
-        resized = cv2.resize(img, (target_w, target_h), 0, 0, interpolation=cv2.INTER_NEAREST)
-    
+
         top = int(max(0, np.round((self._pad_height - target_h) / 2)))
         left = int(max(0, np.round((self._pad_width - target_w) / 2)))
         bottom = self._pad_height - top - target_h
         right = self._pad_width - left - target_w
-    
-        resized_with_pad = cv2.copyMakeBorder(resized, top, bottom, left, right, cv2.BORDER_CONSTANT, self._pad_value)
-    
-        # transpose(2,0,1) converts the image to the HWC format which CNTK accepts
-        model_arg_rep = np.ascontiguousarray(np.array(resized_with_pad, dtype=np.float32).transpose(2, 0, 1))
 
         xyxy = annotations[:, :4]
         xyxy *= scale_factor
-        xyxy += (top, left, top, left)
+        xyxy += (left, top, left, top)
+
         # not needed since xyxy is just a reference: annotations[:, :4] = xyxy
         # TODO: do we need to round/floor/ceil xyxy coords?
         annotations[:, 0] = np.round(annotations[:, 0])
         annotations[:, 1] = np.round(annotations[:, 1])
         annotations[:, 2] = np.round(annotations[:, 2])
         annotations[:, 3] = np.round(annotations[:, 3])
+
+        # keep image stats for scaling and padding images later
+        img_stats = [target_w, target_h, img_width, img_height, top, bottom, left, right]
+        self._img_stats.append(img_stats)
+
+    def _load_resize_and_pad(self, index):
+        image_path = self._img_file_paths[index]
+        annotations = self._gt_annotations[index]
+        target_w, target_h, img_width, img_height, top, bottom, left, right = self._img_stats[index]
+
+        img = cv2.imread(image_path)
+        resized = cv2.resize(img, (target_w, target_h), 0, 0, interpolation=cv2.INTER_NEAREST)
+        resized_with_pad = cv2.copyMakeBorder(resized, top, bottom, left, right, cv2.BORDER_CONSTANT, self._pad_value)
+
+        # transpose(2,0,1) converts the image to the HWC format which CNTK accepts
+        model_arg_rep = np.ascontiguousarray(np.array(resized_with_pad, dtype=np.float32).transpose(2, 0, 1))
 
         # dims = pad_width, pad_height, scaled_image_width, scaled_image_height, orig_img_width, orig_img_height
         dims = (self._pad_width, self._pad_height, target_w, target_h, img_width, img_height)
