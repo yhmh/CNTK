@@ -32,7 +32,7 @@ def _get_image_paths(img_dir, training_set):
         sub_dir_path = os.path.join(img_dir, subdir)
         imgFilenames = _getFilesInDirectory(sub_dir_path, ".jpg")
         for img in imgFilenames:
-            image_paths.append(os.path.join(sub_dir_path, img))
+            image_paths.append("{}/{}".format(subdir, img))
 
     return image_paths
 
@@ -71,18 +71,19 @@ def _load_annotation(imgPath):
 
     return annotations
 
-def create_map_files(data_folder):
-    # TODO: get relative paths for map files
-    img_file_paths = _get_image_paths(data_folder, training_set=True)
+def create_map_files(data_folder, training_set):
+    # get relative paths for map files
+    img_file_paths = _get_image_paths(data_folder, training_set)
 
-    out_map_file_path = os.path.join(data_folder, "img_map_file.txt")
-    roi_file_path = os.path.join(data_folder, "roi_map_file.txt")
+    out_map_file_path = os.path.join(data_folder, "{}_img_file.txt".format("train" if training_set else "test"))
+    roi_file_path = os.path.join(data_folder, "{}_roi_file.txt".format("train" if training_set else "test"))
 
     counter = 0
     with open(out_map_file_path, 'w') as img_file:
         with open(roi_file_path, 'w') as roi_file:
             for img_path in img_file_paths:
-                gt_annotations = _load_annotation(img_path)
+                abs_img_path = os.path.join(data_folder, img_path)
+                gt_annotations = _load_annotation(abs_img_path)
                 if gt_annotations is None:
                     continue
 
@@ -99,4 +100,5 @@ def create_map_files(data_folder):
                     print("Processed {} images".format(counter))
 
 if __name__ == '__main__':
-    create_map_files(r"C:\src\CNTK\Examples\Image\DataSets\Grocery")
+    create_map_files(r"C:\src\CNTK\Examples\Image\DataSets\Grocery", training_set=True)
+    create_map_files(r"C:\src\CNTK\Examples\Image\DataSets\Grocery", training_set=False)

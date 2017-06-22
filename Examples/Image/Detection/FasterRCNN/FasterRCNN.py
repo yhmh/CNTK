@@ -52,8 +52,8 @@ mb_size = 1
 image_width = cfg["CNTK"].IMAGE_WIDTH
 image_height = cfg["CNTK"].IMAGE_HEIGHT
 num_channels = 3
-# im_info = cntk.constant([image_width, image_height, 1], (3,)) # !!! use dims_input instead!
-# dims_input - (pad_width, pad_height, scaled_image_width, scaled_image_height, orig_img_width, orig_img_height)
+
+# dims_input -- (pad_width, pad_height, scaled_image_width, scaled_image_height, orig_img_width, orig_img_height)
 dims_input_const = MinibatchData(Value(batch=np.asarray(
     [image_width, image_height, image_width, image_height, image_width, image_height], dtype=np.float32)), 1, 1, False)
 
@@ -234,18 +234,6 @@ def create_eval_model(model, image_input, dims_input):
     cls_pred = softmax(cls_score, axis=1, name='cls_pred')
     return combine([cls_pred, rpn_rois, bbox_regr])
 
-def convert_gt_boxes(gt_boxes, im_width, name="converted_gt_boxes"):
-    # For CNTK: convert and scale gt_box coords from x, y, w, h relative to x1, y1, x2, y2 absolute
-    roi_xy1 = slice(gt_boxes, 1, 0, 2)
-    roi_wh = slice(gt_boxes, 1, 2, 4)
-    roi_label = slice(gt_boxes, 1, 4, 5)
-    roi_xy2 = plus(roi_xy1, roi_wh)
-    roi_xyxy = splice(roi_xy1, roi_xy2, axis=1)
-    scaled_roi_xyxy = element_times(roi_xyxy, (1.0 * im_width))
-    scaled_gt_boxes = splice(scaled_roi_xyxy, roi_label, axis=1)
-
-    return alias(scaled_gt_boxes, name=name)
-
 def train_model(image_input, roi_input, dims_input, loss, pred_error,
                 lr_schedule, mm_schedule, l2_reg_weight, epochs_to_train):
     if isinstance(loss, cntk.Variable):
@@ -290,10 +278,6 @@ def train_model_using_cntk_reader(image_input, roi_input, dims_input, trainer, e
         progress_printer.epoch_summary(with_metric=True)
 
 def train_model_using_python_reader(image_input, roi_input, dims_input, trainer, epochs_to_train):
-    # od_reader = ObjectDetectionReader(globalvars['train_map_file'], globalvars['train_roi_file'],
-    #                                  max_annotations_per_image=cfg["CNTK"].INPUT_ROIS_PER_IMAGE,
-    #                                  pad_width=image_width, pad_height=image_height, pad_value=114)
-
     # Create the minibatch source
     od_minibatch_source = ObjectDetectionMinibatchSource(
         globalvars['train_map_file'], globalvars['train_roi_file'],
@@ -328,11 +312,8 @@ def train_faster_rcnn_e2e(debug_output=False):
     roi_input = input_variable((cfg["CNTK"].INPUT_ROIS_PER_IMAGE, 5), dynamic_axes=[Axis.default_batch_axis()])
     dims_input = input_variable((6), dynamic_axes=[Axis.default_batch_axis()])
 
-    # For CNTK: convert and scale gt_box coords from x, y, w, h relative to x1, y1, x2, y2 absolute
-    scaled_gt_boxes = convert_gt_boxes(roi_input, image_width, name='roi_input')
-
     # Instantiate the Faster R-CNN prediction model and loss function
-    predictions, loss, pred_error = create_faster_rcnn_predictor(image_input, scaled_gt_boxes)
+    predictions, loss, pred_error = create_faster_rcnn_predictor(image_input, roi_input)
 
     if debug_output:
         print("Storing graphs and models to %s." % globalvars['output_path'])
@@ -364,7 +345,7 @@ def train_faster_rcnn_alternating(debug_output=False):
             # lr = [0.001] * 12 + [0.0001] * 4, momentum = 0.9, weight decay = 0.0005 (cf. stage2_rpn_solver60k80k.pt)
         
         # Keep conv and rpn weights from stpe 3 and fix them
-            # --> train only detection netwrok
+            # --> train only detection network
             # lr = [0.001] * 6 + [0.0001] * 2, momentum = 0.9, weight decay = 0.0005 (cf. stage2_fast_rcnn_solver30k40k.pt)
     '''
 
@@ -383,12 +364,7 @@ def train_faster_rcnn_alternating(debug_output=False):
     dims_input = input_variable((6), dynamic_axes=[Axis.default_batch_axis()])
     dims_node = alias(dims_input, name='dims_input')
     feat_norm = image_input - Constant(114)
-
-    # For CNTK: convert and scale gt_box coords from x, y, w, h relative to x1, y1, x2, y2 absolute
-    if cfg["CNTK"].USE_PYTHON_READER:
-        scaled_gt_boxes = alias(roi_input, name='roi_input')
-    else:
-        scaled_gt_boxes = convert_gt_boxes(roi_input, image_width, name='roi_input')
+    scaled_gt_boxes = alias(roi_input, name='roi_input')
 
     # base image classification model (e.g. VGG16 or AlexNet)
     base_model = load_model(base_model_file)
@@ -437,7 +413,7 @@ def train_faster_rcnn_alternating(debug_output=False):
         # Create full network, initialize conv layers with imagenet, fix rpn weights
             #       initial weights     train?
             # conv: base_model          only conv3_1 and up
-            # rpn:  stage1 rpn model    no
+            # rpn:  stage1a rpn model   no
             # frcn: base_model + new    yes
 
         # conv_layers
@@ -482,8 +458,8 @@ def train_faster_rcnn_alternating(debug_output=False):
     if True:
         # Keep conv weights from detection network and fix them
             #       initial weights     train?
-            # conv: stage1 frcn model   no
-            # rpn:  stage1 rpn model    yes
+            # conv: stage1b frcn model  no
+            # rpn:  stage1a rpn model   yes
             # frcn: -                   -
 
         # conv_layers
@@ -507,9 +483,9 @@ def train_faster_rcnn_alternating(debug_output=False):
     if True:
         # Keep conv and rpn weights from step 3 and fix them
             #       initial weights     train?
-            # conv: stage2 rpn model    no
-            # rpn:  stage2 rpn model    no
-            # frcn: stage1 frcn modle   yes                   -
+            # conv: stage2a rpn model   no
+            # rpn:  stage2a rpn model   no
+            # frcn: stage1b frcn modle  yes                   -
 
         # conv_layers
         conv_layers = clone_model(stage2_rpn_network, [feature_node_name], [last_conv_node_name], CloneMethod.freeze)
@@ -584,13 +560,14 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
         gt_row = gt_row.reshape((cfg["CNTK"].INPUT_ROIS_PER_IMAGE, 5))
         all_gt_boxes = gt_row[np.where(gt_row[:,-1] > 0)]
 
-        # transform from (x, y, w, h) relative to (x_min, y_min, x_max, y_max) absolute
-        gt_coords = all_gt_boxes[:, :4]
-        gt_labels = all_gt_boxes[:, 4:]
-        gt_coords = gt_coords * 1000.0
-        wh = gt_coords[:,2:4]
-        gt_coords[:,2:4] = gt_coords[:,0:2] + wh
-        all_gt_boxes = np.hstack((gt_coords, gt_labels))
+        if not cfg['CNTK'].USE_PYTHON_READER:
+            # transform from (x, y, w, h) relative to (x_min, y_min, x_max, y_max) absolute
+            gt_coords = all_gt_boxes[:, :4]
+            gt_labels = all_gt_boxes[:, 4:]
+            gt_coords = gt_coords * 1000.0
+            wh = gt_coords[:,2:4]
+            gt_coords[:,2:4] = gt_coords[:,0:2] + wh
+            all_gt_boxes = np.hstack((gt_coords, gt_labels))
 
         for cls_index, cls_name in enumerate(classes):
             if cls_index == 0: continue

@@ -38,7 +38,7 @@ __C.CNTK.MAKE_MODE = False
 __C.CNTK.TRAIN_E2E = False
 __C.CNTK.DEBUG_OUTPUT = True
 __C.CNTK.USE_MEAN_GRADIENT = False
-__C.CNTK.USE_PYTHON_READER = False
+__C.CNTK.USE_PYTHON_READER = True
 
 __C.CNTK.DATASET = "Grocery" # "Grocery" or "Pascal"
 __C.CNTK.BASE_MODEL = "AlexNet" # "VGG16" or "AlexNet"
@@ -69,9 +69,9 @@ __C.CNTK.RESULTS_NMS_THRESHOLD = 0.3
 __C.CNTK.RESULTS_CONF_THRESHOLD = 0.7
 
 __C.CNTK.GRAPH_TYPE = "png" # "png" or "pdf"
-__C.CNTK.VISUALIZE_RESULTS = False
+__C.CNTK.VISUALIZE_RESULTS = True
 __C.CNTK.DRAW_NEGATIVE_ROIS = False
-__C.CNTK.DRAW_UNREGRESSED_ROIS = True
+__C.CNTK.DRAW_UNREGRESSED_ROIS = False
 
 __C.CNTK.FEATURE_STREAM_NAME = 'features'
 __C.CNTK.ROI_STREAM_NAME = 'roiAndLabel'
@@ -85,15 +85,14 @@ if __C.CNTK.DATASET == "Grocery":
     __C.CNTK.CLASSES = ('__background__',  # always index 0
                         'avocado', 'orange', 'butter', 'champagne', 'eggBox', 'gerkin', 'joghurt', 'ketchup',
                         'orangeJuice', 'onion', 'pepper', 'tomato', 'water', 'milk', 'tabasco', 'mustard')
-    __C.CNTK.MAP_FILE_PATH = "Data/Grocery"
-    if __C.CNTK.USE_PYTHON_READER:
-        __C.CNTK.TRAIN_MAP_FILE = "img_map_file.txt"
-        __C.CNTK.TRAIN_ROI_FILE = "roi_map_file.txt"
-    else:
-        __C.CNTK.TRAIN_MAP_FILE = "train.imgMap.txt"
-        __C.CNTK.TRAIN_ROI_FILE = "train.GTRois.txt"
-    __C.CNTK.TEST_MAP_FILE = "test.imgMap.txt"
-    __C.CNTK.TEST_ROI_FILE = "test.GTRois.txt"
+    __C.CNTK.MAP_FILE_PATH = "../../DataSets/Grocery"
+    __C.CNTK.TRAIN_MAP_FILE = "train_img_file.txt"
+    __C.CNTK.TEST_MAP_FILE = "test_img_file.txt"
+    __C.CNTK.TRAIN_ROI_FILE = "train_roi_file.txt"
+    __C.CNTK.TEST_ROI_FILE = "test_roi_file.txt"
+    if not __C.CNTK.USE_PYTHON_READER:
+        __C.CNTK.TRAIN_ROI_FILE = "train_roi_file_relative.txt"
+        __C.CNTK.TEST_ROI_FILE = "test_roi_file_relative.txt"
     __C.CNTK.NUM_TRAIN_IMAGES = 20
     __C.CNTK.NUM_TEST_IMAGES = 5
 
@@ -121,7 +120,7 @@ if __C.CNTK.BASE_MODEL == "AlexNet":
     __C.CNTK.POOL_NODE_NAME = "pool3"
     __C.CNTK.LAST_HIDDEN_NODE_NAME = "h2_d"
     __C.CNTK.ROI_DIM = 6
-    __C.CNTK.PROPOSAL_LAYER_PARAMS = "'feat_stride': 16\n'scales':\n - 8 \n - 16 \n - 32"
+    __C.CNTK.PROPOSAL_LAYER_PARAMS = "'feat_stride': 16\n'scales':\n - 4 \n - 8 \n - 12"
 
 if __C.CNTK.BASE_MODEL == "VGG16":
     __C.CNTK.BASE_MODEL_FILE = "VGG16_ImageNet.cntkmodel"
@@ -261,9 +260,9 @@ __C.TEST.PROPOSAL_METHOD = 'selective_search'
 ## NMS threshold used on RPN proposals
 __C.TEST.RPN_NMS_THRESH = 0.7
 ## Number of top scoring boxes to keep before apply NMS to RPN proposals
-__C.TEST.RPN_PRE_NMS_TOP_N = 10000 # 6000
+__C.TEST.RPN_PRE_NMS_TOP_N = 12000 # caffe: 6000
 ## Number of top scoring boxes to keep after applying NMS to RPN proposals
-__C.TEST.RPN_POST_NMS_TOP_N = 2000 # 300
+__C.TEST.RPN_POST_NMS_TOP_N = 2000 # caffe: 300
 # Proposal height and width both need to be greater than RPN_MIN_SIZE (at orig image scale)
 __C.TEST.RPN_MIN_SIZE = 16
 
