@@ -12,14 +12,14 @@ import pdb
 
 class ObjectDetectionMinibatchSource(UserMinibatchSource):
     def __init__(self, img_map_file, roi_map_file, max_annotations_per_image,
-                 pad_width, pad_height, pad_value, randomize=True):
+                 pad_width, pad_height, pad_value, randomize=True, max_images=None):
 
         self.image_si = StreamInformation("image", 0, 'dense', np.float32, (3, pad_height, pad_width,))
         self.roi_si = StreamInformation("annotation", 1, 'dense', np.float32, (max_annotations_per_image, 5,))
         self.dims_si = StreamInformation("dims", 1, 'dense', np.float32, (4,))
 
         self.od_reader = ObjectDetectionReader(img_map_file, roi_map_file, max_annotations_per_image,
-                 pad_width, pad_height, pad_value, randomize)
+                 pad_width, pad_height, pad_value, randomize, max_images)
 
         super(ObjectDetectionMinibatchSource, self).__init__()
 

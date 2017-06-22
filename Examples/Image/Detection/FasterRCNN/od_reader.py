@@ -11,7 +11,7 @@ import pdb
 
 class ObjectDetectionReader:
     def __init__(self, img_map_file, roi_map_file, max_annotations_per_image,
-                 pad_width, pad_height, pad_value, randomize=True):
+                 pad_width, pad_height, pad_value, randomize=True, max_images=None):
         self._pad_width = pad_width
         self._pad_height = pad_height
         self._pad_value = np.array([pad_value, pad_value, pad_value])
@@ -20,7 +20,7 @@ class ObjectDetectionReader:
         self._gt_annotations = []
         self._img_stats = []
 
-        self._num_images = self._parse_map_files(img_map_file, roi_map_file, max_annotations_per_image)
+        self._num_images = self._parse_map_files(img_map_file, roi_map_file, max_annotations_per_image, max_images)
         for i in range(self._num_images):
             self._scale_and_pad_annotations(i)
 
@@ -43,11 +43,13 @@ class ObjectDetectionReader:
     def sweep_end(self):
         return self._reading_index >= self._num_images
 
-    def _parse_map_files(self, img_map_file, roi_map_file, max_annotations_per_image):
+    def _parse_map_files(self, img_map_file, roi_map_file, max_annotations_per_image, max_images):
         # read image map file and buffer sequence numbers
         with open(img_map_file) as f:
             img_map_lines = f.readlines()
         img_map_lines = [line for line in img_map_lines if len(line) > 0]
+        if max_images is not None:
+            img_map_lines = img_map_lines[:max_images]
         img_sequence_numbers = [int(x.split('\t')[0]) for x in img_map_lines]
         img_base_path = os.path.dirname(os.path.abspath(img_map_file))
         self._img_file_paths = [os.path.join(img_base_path, x.split('\t')[1]) for x in img_map_lines]
@@ -57,6 +59,8 @@ class ObjectDetectionReader:
             roi_map_lines = f.readlines()
         # TODO: check whether this avoids reading empty lines
         roi_map_lines = [line for line in roi_map_lines if len(line) > 0]
+        if max_images is not None:
+            roi_map_lines = roi_map_lines[:max_images]
         roi_sequence_numbers = []
         for roi_line in roi_map_lines:
             roi_sequence_numbers.append(int(roi_line[:roi_line.find(' ')]))

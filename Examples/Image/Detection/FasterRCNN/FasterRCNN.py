@@ -282,7 +282,8 @@ def train_model_using_python_reader(image_input, roi_input, dims_input, trainer,
     od_minibatch_source = ObjectDetectionMinibatchSource(
         globalvars['train_map_file'], globalvars['train_roi_file'],
         max_annotations_per_image=cfg["CNTK"].INPUT_ROIS_PER_IMAGE,
-        pad_width=image_width, pad_height=image_height, pad_value=114)
+        pad_width=image_width, pad_height=image_height, pad_value=114,
+        max_images=cfg["CNTK"].NUM_TRAIN_IMAGES)
 
     # define mapping from reader streams to network inputs
     input_map = {
@@ -520,7 +521,8 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
         minibatch_source = ObjectDetectionMinibatchSource(
             img_map_file, roi_map_file,
             max_annotations_per_image=cfg["CNTK"].INPUT_ROIS_PER_IMAGE,
-            pad_width=image_width, pad_height=image_height, pad_value=114, randomize=False)
+            pad_width=image_width, pad_height=image_height, pad_value=114, randomize=False,
+            max_images=cfg["CNTK"].NUM_TEST_IMAGES)
 
         # define mapping from reader streams to network inputs
         input_map = {
@@ -621,10 +623,8 @@ if __name__ == '__main__':
         os.chdir(map_file_path)
         if not os.path.exists(os.path.join(abs_path, "Output")):
             os.makedirs(os.path.join(abs_path, "Output"))
-        if not os.path.exists(os.path.join(abs_path, "Output", "Grocery")):
-            os.makedirs(os.path.join(abs_path, "Output", "Grocery"))
-        if not os.path.exists(os.path.join(abs_path, "Output", "Pascal")):
-            os.makedirs(os.path.join(abs_path, "Output", "Pascal"))
+        if not os.path.exists(os.path.join(abs_path, "Output", cfg["CNTK"].DATASET)):
+            os.makedirs(os.path.join(abs_path, "Output", cfg["CNTK"].DATASET))
 
     parse_arguments()
     model_path = os.path.join(globalvars['output_path'], "faster_rcnn_eval_{}_{}.model"

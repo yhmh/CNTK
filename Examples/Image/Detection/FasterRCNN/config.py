@@ -40,7 +40,7 @@ __C.CNTK.DEBUG_OUTPUT = True
 __C.CNTK.USE_MEAN_GRADIENT = False
 __C.CNTK.USE_PYTHON_READER = True
 
-__C.CNTK.DATASET = "Grocery" # "Grocery" or "Pascal"
+__C.CNTK.DATASET = "Overfit" # "Grocery" or "Pascal" ("Overfit")
 __C.CNTK.BASE_MODEL = "AlexNet" # "VGG16" or "AlexNet"
 
 # Learning parameters
@@ -95,18 +95,33 @@ if __C.CNTK.DATASET == "Grocery":
         __C.CNTK.TEST_ROI_FILE = "test_roi_file_relative.txt"
     __C.CNTK.NUM_TRAIN_IMAGES = 20
     __C.CNTK.NUM_TEST_IMAGES = 5
+    __C.CNTK.PROPOSAL_LAYER_PARAMS = "'feat_stride': 16\n'scales':\n - 4 \n - 8 \n - 12"
 
 if __C.CNTK.DATASET == "Pascal":
     __C.CNTK.CLASSES = ('__background__',  # always index 0
                         'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable',
                         'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor')
-    __C.CNTK.MAP_FILE_PATH = "Data/Pascal"
+    __C.CNTK.MAP_FILE_PATH = "../../DataSets/Pascal/mappings"
     __C.CNTK.TRAIN_MAP_FILE = "trainval2007.txt"
+    __C.CNTK.TRAIN_ROI_FILE = "trainval2007_rois_abs-xyxy_pad.txt"
     __C.CNTK.TEST_MAP_FILE = "test2007.txt"
-    __C.CNTK.TRAIN_ROI_FILE = "trainval2007_rois_topleft_wh_rel_pad.txt"
-    __C.CNTK.TEST_ROI_FILE = "test2007_rois_topleft_wh_rel_pad.txt"
+    __C.CNTK.TEST_ROI_FILE = "test2007_rois_abs-xyxy_pad.txt"
     __C.CNTK.NUM_TRAIN_IMAGES = 5010
     __C.CNTK.NUM_TEST_IMAGES = 4952
+    __C.CNTK.PROPOSAL_LAYER_PARAMS = "'feat_stride': 16\n'scales':\n - 8 \n - 16 \n - 32"
+
+if __C.CNTK.DATASET == "Overfit":
+    __C.CNTK.CLASSES = ('__background__',  # always index 0
+                        'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable',
+                        'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor')
+    __C.CNTK.MAP_FILE_PATH = "../../DataSets/Pascal/mappings"
+    __C.CNTK.TRAIN_MAP_FILE = "test2007.txt"
+    __C.CNTK.TRAIN_ROI_FILE = "test2007_rois_abs-xyxy_pad.txt"
+    __C.CNTK.TEST_MAP_FILE = "test2007.txt"
+    __C.CNTK.TEST_ROI_FILE = "test2007_rois_abs-xyxy_pad.txt"
+    __C.CNTK.NUM_TRAIN_IMAGES = 1 #5010
+    __C.CNTK.NUM_TEST_IMAGES = 1 #4952
+    __C.CNTK.PROPOSAL_LAYER_PARAMS = "'feat_stride': 16\n'scales':\n - 8 \n - 16 \n - 32"
 
 #
 # Base models
@@ -120,7 +135,6 @@ if __C.CNTK.BASE_MODEL == "AlexNet":
     __C.CNTK.POOL_NODE_NAME = "pool3"
     __C.CNTK.LAST_HIDDEN_NODE_NAME = "h2_d"
     __C.CNTK.ROI_DIM = 6
-    __C.CNTK.PROPOSAL_LAYER_PARAMS = "'feat_stride': 16\n'scales':\n - 4 \n - 8 \n - 12"
 
 if __C.CNTK.BASE_MODEL == "VGG16":
     __C.CNTK.BASE_MODEL_FILE = "VGG16_ImageNet.cntkmodel"
@@ -130,7 +144,6 @@ if __C.CNTK.BASE_MODEL == "VGG16":
     __C.CNTK.POOL_NODE_NAME = "pool5"
     __C.CNTK.LAST_HIDDEN_NODE_NAME = "drop7"
     __C.CNTK.ROI_DIM = 7
-    __C.CNTK.PROPOSAL_LAYER_PARAMS = "'feat_stride': 16\n'scales':\n - 8 \n - 16 \n - 32"
 
 #
 # Training options

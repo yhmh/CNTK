@@ -5,8 +5,10 @@ from xml.etree import ElementTree
 from enum import Enum
 from PIL import Image
 
-use_center_of_bbox = False      # top left corner (i.e. xmin, ymin) will be used if set to False
-use_relative_coords = True      # Absolute pixel coordinates will be used if set to False
+# (ctrx, ctry, w, h) in relative coords (e.g. for Yolo)
+use_relative_coords_ctr_wh = False
+# else: top left and bottom right corner are used (i.e. xmin, ymin, xmax, ymax) in absolute coords
+
 use_pad_scale = True
 pad_width = 1000
 pad_height = 1000
@@ -15,20 +17,7 @@ pascal_voc2007_jpgimg_rel_path = "../VOCdevkit/VOC2007/JPEGImages/"
 pascal_voc2007_imgsets_rel_path = "../VOCdevkit/VOC2007/ImageSets/Main/"
 pascal_voc2007_annotations_rel_path = "../VOCdevkit/VOC2007/Annotations/"
 
-train = False
-if train:
-    img_map_input = "../VOCdevkit/VOC2007/ImageSets/Main/trainval.txt"
-    img_map_output = "trainval2007.txt"
-    roi_map_output = "trainval2007_rois_{}_wh_{}_{}.txt".format("center" if use_center_of_bbox else "topleft", "rel" if use_relative_coords else "abs", "pad" if use_pad_scale else "noPad")
-else:
-    img_map_input = "../VOCdevkit/VOC2007/ImageSets/Main/test.txt"
-    img_map_output = "test2007.txt"
-    roi_map_output = "test2007_rois_{}_wh_{}_{}.txt".format("center" if use_center_of_bbox else "topleft", "rel" if use_relative_coords else "abs", "pad" if use_pad_scale else "noPad")
-
 abs_path = os.path.dirname(os.path.abspath(__file__))
-in_map_file_path = os.path.join(abs_path, img_map_input)
-out_map_file_path = os.path.join(abs_path, img_map_output)
-roi_file_path = os.path.join(abs_path, roi_map_output)
 cls_file_path = os.path.join(abs_path, "class_map.txt")
 
 classes = ('__background__',  # always index 0
@@ -37,18 +26,12 @@ classes = ('__background__',  # always index 0
 class_dict = {k: v for v, k in enumerate(classes)}
 
 def format_roi(cls_index, xmin, ymin, xmax, ymax, img_file_path):
-    if use_center_of_bbox:
-        width = (xmax - xmin)
-        height = (ymax - ymin)
-        posx = xmin + width / 2
-        posy = ymin + height / 2
-    else:
-        width = (xmax - xmin)
-        height = (ymax - ymin)
-        posx = xmin
-        posy = ymin
+    posx = xmin
+    posy = ymin
+    width = (xmax - xmin)
+    height = (ymax - ymin)
 
-    if use_pad_scale or use_relative_coords:
+    if use_pad_scale or use_relative_coords_ctr_wh:
         img_width, img_height = Image.open(img_file_path).size
 
     if use_pad_scale:
@@ -78,17 +61,37 @@ def format_roi(cls_index, xmin, ymin, xmax, ymax, img_file_path):
         norm_width = img_width
         norm_height = img_height
 
-    if use_relative_coords:
+    if use_relative_coords_ctr_wh:
+        ctrx = xmin + width / 2
+        ctry = ymin + height / 2
+
         width = float(width) / norm_width
         height = float(height) / norm_height
-        posx = float (posx) / norm_width
-        posy = float(posy) / norm_height
+        ctrx = float (ctrx) / norm_width
+        ctry = float(ctry) / norm_height
 
-        return "{:.4f} {:.4f} {:.4f} {:.4f} {} ".format(posx, posy, width, height, cls_index)
+        return "{:.4f} {:.4f} {:.4f} {:.4f} {} ".format(ctrx, ctry, width, height, cls_index)
     else:
-        return "{} {} {} {} {} ".format(int(posx), int(posy), int(width), int(height), cls_index)
+        posx2 = posx + width
+        posy2 = posy + height
+        return "{} {} {} {} {} ".format(int(posx), int(posy), int(posx2), int(posy2), cls_index)
 
-if __name__ == '__main__':
+def create_mappings(train):
+    if train:
+        img_map_input = "../VOCdevkit/VOC2007/ImageSets/Main/trainval.txt"
+        img_map_output = "trainval2007.txt"
+        roi_map_output = "trainval2007_rois_{}_{}.txt".format(
+            "rel-ctr-wh" if use_relative_coords_ctr_wh else "abs-xyxy", "pad" if use_pad_scale else "noPad")
+    else:
+        img_map_input = "../VOCdevkit/VOC2007/ImageSets/Main/test.txt"
+        img_map_output = "test2007.txt"
+        roi_map_output = "test2007_rois_{}_{}.txt".format("rel-ctr-wh" if use_relative_coords_ctr_wh else "abs-xyxy",
+                                                          "pad" if use_pad_scale else "noPad")
+
+    in_map_file_path = os.path.join(abs_path, img_map_input)
+    out_map_file_path = os.path.join(abs_path, img_map_output)
+    roi_file_path = os.path.join(abs_path, roi_map_output)
+
     with open(in_map_file_path) as input_file:
         input_lines = input_file.readlines()
 
@@ -126,3 +129,6 @@ if __name__ == '__main__':
         for cls in classes:
             cls_file.write("{}\t{}\n".format(cls, class_dict[cls]))
 
+if __name__ == '__main__':
+    create_mappings(True)
+    create_mappings(False)
