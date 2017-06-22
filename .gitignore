@@ -39,6 +39,7 @@ bin/
 *.obj
 *.pch
 *.pdb
+*.idb
 *.pgc
 *.pgd
 *.rsp
@@ -49,6 +50,7 @@ bin/
 *.tmp
 *.tmp_proj
 *.log
+*.tlog
 *.vspscc
 *.vssscc
 .builds
@@ -58,6 +60,8 @@ bin/
 *.dep
 *.o
 *.d
+*.intermediate
+*.resfiles
 
 # Visual C++ cache files
 ipch/
