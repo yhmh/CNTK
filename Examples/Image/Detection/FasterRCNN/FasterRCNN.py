@@ -619,6 +619,7 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
 # The main method trains and evaluates a Fast R-CNN model.
 # If a trained model is already available it is loaded an no training will be performed.
 if __name__ == '__main__':
+    np.random.seed(seed=23)
     if os.path.exists(map_file_path):
         os.chdir(map_file_path)
         if not os.path.exists(os.path.join(abs_path, "Output")):

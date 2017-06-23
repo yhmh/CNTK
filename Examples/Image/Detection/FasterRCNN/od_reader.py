@@ -37,7 +37,9 @@ class ObjectDetectionReader:
         '''
 
         index = self._get_next_image_index()
-        img_data, roi_data, img_dims = self._load_resize_and_pad(index)
+        img_data, img_dims = self._load_resize_and_pad_image(index)
+        roi_data = self._gt_annotations[index]
+
         return img_data, roi_data, img_dims
 
     def sweep_end(self):
@@ -139,9 +141,8 @@ class ObjectDetectionReader:
         img_stats = [target_w, target_h, img_width, img_height, top, bottom, left, right]
         self._img_stats.append(img_stats)
 
-    def _load_resize_and_pad(self, index):
+    def _load_resize_and_pad_image(self, index):
         image_path = self._img_file_paths[index]
-        annotations = self._gt_annotations[index]
         target_w, target_h, img_width, img_height, top, bottom, left, right = self._img_stats[index]
 
         img = cv2.imread(image_path)
@@ -153,4 +154,4 @@ class ObjectDetectionReader:
 
         # dims = pad_width, pad_height, scaled_image_width, scaled_image_height, orig_img_width, orig_img_height
         dims = (self._pad_width, self._pad_height, target_w, target_h, img_width, img_height)
-        return model_arg_rep, annotations, dims
+        return model_arg_rep, dims
