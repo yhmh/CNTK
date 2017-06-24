@@ -161,11 +161,22 @@ public:
     {
         auto gradient      =                      GradientFor(fr);
         auto inputGradient = InputRef(inputIndex).GradientFor(fr);
-        inputGradient += gradient.Reshaped(inputGradient.GetNumRows(), inputGradient.GetNumCols());
+
+        if (Input(inputIndex)->ParentGradientReused())
+        {
+            if (gradient.Data() != inputGradient.Data() ||
+                gradient.GetNumRows() != inputGradient.GetNumRows() ||
+                gradient.GetNumCols() != inputGradient.GetNumCols())
+                LogicError("Gradient should be reused");
+        }
+        else
+            inputGradient += gradient.Reshaped(inputGradient.GetNumRows(), inputGradient.GetNumCols());
     }
 
     virtual bool OutputUsedInComputingInputNodesGradients() const override { return false; }
     virtual bool InputUsedInComputingInputNodesGradients(size_t /*childIndex*/) const override { return false; }
+
+    virtual ParentGradientOptimization ImplementsGradientOptimization(const ComputationNodeBase* input) const override { return ParentGradientOptimization::Reuse; }
 
 private:
     TensorShape m_replacementSampleLayout; // user-specified dimensions to replace dimensions [beginAxis, endAxis]

@@ -161,12 +161,13 @@ typedef IStatefulNode::NodeStatePtr NodeStatePtr;
 // =======================================================================
 
 class ComputationNetwork;
+class ComputationNodeBase;
 struct ComputationNetworkOwnedNodeState
 {
     friend class ComputationNetwork;
 
     ComputationNetworkOwnedNodeState()
-        : m_needsGradient(false), m_needsDynamicValidation(false), m_valueSharable(true), m_parentOverwritesGradient(false)
+        : m_needsGradient(false), m_needsDynamicValidation(false), m_valueSharable(true), m_parentGradientOptimization(ParentGradientOptimization::None)
     {
         PurgeStateForFormingRecurrentLoops();
         m_isPartOfLoop = false;
@@ -183,13 +184,28 @@ struct ComputationNetworkOwnedNodeState
         other.m_traceNodeValueSparse          = m_traceNodeValueSparse;
         other.m_traceNodeValueUpToDim         = m_traceNodeValueUpToDim;
         other.m_traceNodeValueUpToT           = m_traceNodeValueUpToT;
-        other.m_parentOverwritesGradient = m_parentOverwritesGradient;
+        other.m_parentGradientOptimization    = m_parentGradientOptimization;
     }
 
     bool IsPartOfLoop() const { return m_isPartOfLoop; }
 
-    void MarkParentOverwritesGradient() { m_parentOverwritesGradient = true; }
-    bool ParentOverwritesGradient() const { return m_parentOverwritesGradient; }
+    enum class ParentGradientOptimization
+    {
+        None,
+        Overwrite,
+        Reuse
+    };
+
+    void SetParentGradientOptimization(ParentGradientOptimization opt) { m_parentGradientOptimization = opt; }
+    bool ParentGradientOptimized() const { return m_parentGradientOptimization != ParentGradientOptimization::None; }
+    bool ParentGradientReused() const { return m_parentGradientOptimization == ParentGradientOptimization::Reuse; }
+    bool ParentOverwritesGradient() const
+    {
+        if (ParentGradientReused())
+            LogicError("Unexpected gradient reuse.");
+
+        return ParentGradientOptimized();
+    }
 
     virtual void MarkValueNonSharable() { m_valueSharable = false; }
     virtual void MarkValueSharable() { m_valueSharable = true; }
@@ -205,7 +221,7 @@ struct ComputationNetworkOwnedNodeState
     size_t m_traceNodeValueUpToT = 8;   // 8 time steps fit comfortably into a normal-sized console
     void EnableNodeTracing(bool asReal, bool asCategoryLabel, bool asSparse) { m_traceNodeValueReal = asReal; m_traceNodeValueAsCategoryLabel = asCategoryLabel; m_traceNodeValueSparse = asSparse; }
 
-    virtual bool ImplementsGradientOverwriteOptimization() const { return false; }
+    virtual ParentGradientOptimization ImplementsGradientOptimization(const ComputationNodeBase* /*input*/) const { return ParentGradientOptimization::None; }
 
 protected:                // TODO: should be fully encapsulated here
     bool m_needsGradient; // true if this node or any children need a gradient to be computed (for own consumption or propagation to somewhere in the child tree)
@@ -215,7 +231,7 @@ protected:                // TODO: should be fully encapsulated here
                           // If it is false (e.g., LearnableParameters/InputValue and those nodes are solely induced by LearnableParameters),
                           // it will never be released to memory pool
 
-    bool m_parentOverwritesGradient; // flag indicating whether the parent of this node overwrites the gradient of this node instead of accumulating to it
+    ParentGradientOptimization m_parentGradientOptimization; // flag indicating whether the parent of this node overwrites the gradient of this node instead of accumulating to it
 
 private:
     bool m_isPartOfLoop; // true if this loop is part of a recurrent loop
@@ -463,6 +479,16 @@ public:
     bool ReducesInTimeWrt(const ComputationNodeBasePtr& other) const
     {
         return GetSampleMatrixNumCols() < other->GetSampleMatrixNumCols();
+    }
+
+    bool IsGradientReused() const
+    {
+        for (const auto& input : GetInputs())
+        {
+            if (input->ParentGradientReused())
+                return true;
+        }
+        return false;
     }
 
     // interpretation as a Matrix reference
@@ -1755,7 +1781,7 @@ public:
         UpdateDataSize(Gradient());
 
         // No need to zero initialize the gradient if the node's parent is going to overwrite it anyways
-        if ((val != 0) || !ParentOverwritesGradient())
+        if ((val != 0) || !ParentGradientOptimized())
             Gradient().SetValue(val);
 
         m_gradientInitialized = true;
@@ -1834,7 +1860,7 @@ public:
     virtual void RequestMatricesBeforeBackprop(MatrixPool& matrixPool) override
     {
         size_t matrixSize = m_sampleLayout.GetNumElements();
-        RequestMatrixFromPool(m_gradient, matrixPool, matrixSize, HasMBLayout());
+        RequestMatrixFromPool(m_gradient, matrixPool, matrixSize, HasMBLayout(), /*isWorkSpace*/false, ParentGradientReused() || IsGradientReused());
 
         auto multiOutputNode = dynamic_cast<MultiOutputNode<ElemType>*>(this);
         if (multiOutputNode)
@@ -1850,7 +1876,7 @@ public:
         if (!IsLeaf() && !RequiresPreCompute())
         {
             if (m_gradient != nullptr && m_gradient->GetMatrixType() != SPARSE) // since we don't have a sparse pool yet
-                ReleaseMatrixToPool(m_gradient, matrixPool);
+                ReleaseMatrixToPool(m_gradient, matrixPool, ParentGradientReused() || IsGradientReused());
 
             // Release the Value matrix only if the output value is needed during backprop
             // since in the case it isn't used, we release it during forward prop itself
@@ -1903,18 +1929,24 @@ protected:
     // if the matrix's size will scale with minibatch size, set mbScale = true 
     // if workspace flag is true, the memory request will be treated specially. We assume workspace memory will share their own pointers 
     // this is currently a workaround for workspace memory for convolutions
-    void RequestMatrixFromPool(shared_ptr<Matrix<ElemType>>& matrixPtr, MatrixPool& matrixPool, size_t matrixSize=0, bool mbScale=false, bool isWorkSpace=false)
+    void RequestMatrixFromPool(shared_ptr<Matrix<ElemType>>& matrixPtr, MatrixPool& matrixPool, size_t matrixSize=0, bool mbScale=false, bool isWorkSpace=false, bool aliasing=false)
     {
         if (matrixPtr == nullptr)
         {
-            matrixPool.RequestAllocate<ElemType>(m_deviceId, &matrixPtr, matrixSize, mbScale, isWorkSpace);
+            if (aliasing)
+                matrixPool.RequestAliasedAllocate<ElemType>(m_deviceId, this, &matrixPtr, matrixSize, mbScale);
+            else
+                matrixPool.RequestAllocate<ElemType>(m_deviceId, &matrixPtr, matrixSize, mbScale, isWorkSpace);
         }
     }
 
-    void ReleaseMatrixToPool(shared_ptr<Matrix<ElemType>>& matrixPtr, MatrixPool& matrixPool)
+    void ReleaseMatrixToPool(shared_ptr<Matrix<ElemType>>& matrixPtr, MatrixPool& matrixPool, bool aliasing=false)
     {
         assert(matrixPtr != nullptr);
-        matrixPool.RequestRelease<ElemType>(&matrixPtr);
+        if (aliasing)
+            matrixPool.RequestAliasedRelease<ElemType>(this);
+        else
+            matrixPool.RequestRelease<ElemType>(&matrixPtr);
     }
 
 public:

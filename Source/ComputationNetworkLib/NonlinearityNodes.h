@@ -99,7 +99,7 @@ public:
         return opType == binaryWithInputGradient;
     }
 
-    virtual bool ImplementsGradientOverwriteOptimization() const override { return (opType != noGradient); }
+    virtual ParentGradientOptimization ImplementsGradientOptimization(const ComputationNodeBase*) const override { return (opType != noGradient) ? ParentGradientOptimization::Overwrite : ParentGradientOptimization::None; }
 };
 
 #define UnaryElementWiseWithOpCodeNodeBaseMembers UsingComputationNodeMembersBoilerplate;
