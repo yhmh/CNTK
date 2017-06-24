@@ -2424,7 +2424,8 @@ public:                                                                         
     using Base::NodeName;                                                                                                                                \
     using Base::RequiresPreCompute;                                                                                                                      \
     using Base::ValueAsMatrix;                                                                                                                           \
-    using Base::Value;
+    using Base::Value;                                                                                                                                   \
+    using Base::ParentGradientOptimization;
 
 #define ComputationNodeBoilerplate                                                                                \
 protected: /* some boilerplate goes here */                                                                       \

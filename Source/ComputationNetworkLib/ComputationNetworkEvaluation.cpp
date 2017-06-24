@@ -1160,7 +1160,7 @@ void ComputationNetwork::AllocateAllMatrices(const std::vector<ComputationNodeBa
         std::unordered_map<MatrixPool::AliasNodePtr, MatrixPool::AliasNodePtr> compactGradientAliasRootMap;
         for (const auto& gradientReuseKeyValue : gradientReuseChildrenMap)
         {
-            // keep searching parent until reaching alias root
+            // keep searching parent until reaching root
 
             auto parent = gradientReuseKeyValue.first;
             auto parentIter = gradientReuseParentMap.find(parent);
@@ -1170,7 +1170,7 @@ void ComputationNetwork::AllocateAllMatrices(const std::vector<ComputationNodeBa
                 parentIter = gradientReuseParentMap.find(parentIter->first);
             }
 
-            // add children to the alias group under the alias root
+            // add children to the alias group under the root
 
             auto children = gradientReuseKeyValue.second;
             compactGradientAliasMap[parent].insert(children.begin(), children.end());
@@ -1183,7 +1183,7 @@ void ComputationNetwork::AllocateAllMatrices(const std::vector<ComputationNodeBa
                 compactGradientAliasRootMap[child] = parent;
             }
 
-            // and add alias root itself to the alias group
+            // and add root itself to the alias group
 
             compactGradientAliasMap[parent].insert(parent);
             compactGradientAliasRootMap[parent] = parent;
