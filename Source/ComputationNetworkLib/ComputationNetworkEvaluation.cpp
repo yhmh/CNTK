@@ -1103,7 +1103,7 @@ void ComputationNetwork::AllocateAllMatrices(const std::vector<ComputationNodeBa
         {
             auto parent = *keyValue.second.begin();
             auto opt = parent->ImplementsGradientOptimization(keyValue.first.get());
-            if (opt != ComputationNodeBase::ParentGradientOptimization::None && trainRootNode != parent)
+            if (opt != ParentGradientOptimization::None && trainRootNode != parent)
             {
                 // We cannot enable the gradient overwrite/reuse optimization if this node's (lone) parent
                 // has this same node as multiple of its inputs since, in that case the
@@ -1114,7 +1114,7 @@ void ComputationNetwork::AllocateAllMatrices(const std::vector<ComputationNodeBa
                 {
                     auto child = keyValue.first;
                     child->SetParentGradientOptimization(opt);
-                    if (opt == ComputationNodeBase::ParentGradientOptimization::Reuse)
+                    if (opt == ParentGradientOptimization::Reuse)
                     {
                         gradientReuseChildrenMap[&*parent].insert(&*child);
                         if (gradientReuseParentMap.find(&*child) != gradientReuseParentMap.end())
