@@ -160,6 +160,13 @@ typedef IStatefulNode::NodeStatePtr NodeStatePtr;
 // These members are only to be set, changed, and read by ComputationNetwork code.
 // =======================================================================
 
+enum class ParentGradientOptimization
+{
+    None,
+    Overwrite,
+    Reuse
+};
+
 class ComputationNetwork;
 class ComputationNodeBase;
 struct ComputationNetworkOwnedNodeState
@@ -188,13 +195,6 @@ struct ComputationNetworkOwnedNodeState
     }
 
     bool IsPartOfLoop() const { return m_isPartOfLoop; }
-
-    enum class ParentGradientOptimization
-    {
-        None,
-        Overwrite,
-        Reuse
-    };
 
     void SetParentGradientOptimization(ParentGradientOptimization opt) { m_parentGradientOptimization = opt; }
     bool ParentGradientOptimized() const { return m_parentGradientOptimization != ParentGradientOptimization::None; }
@@ -2424,8 +2424,7 @@ public:                                                                         
     using Base::NodeName;                                                                                                                                \
     using Base::RequiresPreCompute;                                                                                                                      \
     using Base::ValueAsMatrix;                                                                                                                           \
-    using Base::Value;                                                                                                                                   \
-    using Base::ParentGradientOptimization;
+    using Base::Value;
 
 #define ComputationNodeBoilerplate                                                                                \
 protected: /* some boilerplate goes here */                                                                       \
