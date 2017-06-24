@@ -104,22 +104,26 @@ public:
     };
 
     template <class ElemType>
-    MemRequestInfo<ElemType>& GetMemInfo(shared_ptr<Matrix<ElemType>> *pMatrixPtr)
+    MemRequestInfo<ElemType>* GetMemInfo(shared_ptr<Matrix<ElemType>> *pMatrixPtr)
     {
         vector<MemRequestInfo<ElemType>>& memInfoVec = GetMemRequestInfoVec<ElemType>();
         // iterate through the vector and find the pointer memInfo
         for (auto& memInfo : memInfoVec)
         {
             if (memInfo.pMatrixPtrs[0] == pMatrixPtr)
-                return memInfo;
+                return &memInfo;
         }
-        return *(MemRequestInfo<ElemType>*)nullptr;
+        return nullptr;
     }
 
     template <class ElemType>
     void RequestRelease(shared_ptr<Matrix<ElemType>> *pMatrixPtr)
     {
-        GetMemInfo(pMatrixPtr).SetReleaseStep(m_stepCounter);
+        auto memInfo = GetMemInfo(pMatrixPtr);
+        if (memInfo != nullptr)
+        {
+            memInfo->SetReleaseStep(m_stepCounter);
+        }
         m_stepCounter++; 
     }
 
@@ -217,7 +221,7 @@ public:
         {
             auto aliasRootMatrixPtr = (shared_ptr<Matrix<ElemType>>*)aliasInfo.pMatrixPtr;
             *pMatrixPtr = *aliasRootMatrixPtr;
-            GetMemInfo<ElemType>(aliasRootMatrixPtr).pMatrixPtrs.push_back(pMatrixPtr);
+            GetMemInfo<ElemType>(aliasRootMatrixPtr)->pMatrixPtrs.push_back(pMatrixPtr);
         }
     }
 
