@@ -1387,7 +1387,7 @@ JDK_INCLUDE_PATH+=$(JDK_INCLUDE_PATH)/linux
 JAVA_LIB=$(LIBDIR)/libCntk.Core.JavaBinding-$(CNTK_COMPONENT_VERSION).so
 JAVA_DEP_SO_NAMES:=$(CNTKMATH_LIB) $(PERF_PROFILER_LIB) $(CNTKLIBRARY_LIB) $(JAVA_LIB)
 JAVA_DEP_SO_NAMES:=$(JAVA_DEP_SO_NAMES:$(LIBDIR)/%=%)
-JAVA_DEP_SO_NAMES_GPU:=libcublas64_80.so libcudart64_80.so libcudnn64_5.so libcurand64_80.so libcusparse64_80.so libnvml.so
+JAVA_DEP_SO_NAMES_GPU:=libcublas.so libcudart.so libcudnn.so libcurand.so libcusparse.so libnvml.so
 
 .PHONY: java
 java: $(JAVA_LIBS)
