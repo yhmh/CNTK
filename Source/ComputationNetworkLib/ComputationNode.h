@@ -1458,6 +1458,14 @@ protected:
         m_inputs[childIndex] = node;
     }
 
+    bool InputMatchesOutput(size_t i) const
+    {
+        return InputRef(i).HasMBLayout() == HasMBLayout() &&
+            InputRef(i).GetSampleLayout() == GetSampleLayout() &&
+            !InputRef(i).m_needsDynamicValidation &&
+            !m_needsDynamicValidation;
+    }
+
 public:
 
     // -----------------------------------------------------------------------

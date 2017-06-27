@@ -35,8 +35,6 @@ class PlusNode : public BinaryElementWiseNode<ElemType>
     typedef BinaryElementWiseNode<ElemType> Base; UsingBinaryElementwiseNodeBaseMembers;
     static const std::wstring TypeName() { return L"Plus"; }
 
-    bool m_inputsMatchOutput[2]; // whether inputs have the same shape/MBLayout as output
-
 public:
     DeclareConstructorFromConfigWithNumInputs(PlusNode);
     PlusNode(DEVICEID_TYPE deviceId, const wstring& name)
@@ -77,21 +75,6 @@ public:
             inputGradient.AddCopyOf(gradient);
     }
 
-    virtual void /*ComputationNodeBase::*/ Validate(bool isFinalValidationPass) override
-    {
-        Base::Validate(isFinalValidationPass);
-
-        // check if gradient can be reused
-        for (size_t i = 0; i < GetNumInputs(); i++)
-        {
-            m_inputsMatchOutput[i] =
-                InputRef(i).HasMBLayout() == HasMBLayout() &&
-                InputRef(i).GetSampleLayout() == GetSampleLayout() &&
-                !InputRef(i).NeedsDynamicValidation() &&
-                !NeedsDynamicValidation();
-        }
-    }
-
     virtual ParentGradientOptimization ImplementsGradientOptimization(const ComputationNodeBase* input) const override
     {
         size_t i;
@@ -102,7 +85,7 @@ public:
         if (i == GetNumInputs())
             LogicError("Cannot find input.");
 
-        return m_inputsMatchOutput[i] ? ParentGradientOptimization::Reuse : ParentGradientOptimization::Overwrite;
+        return InputMatchesOutput(i) ? ParentGradientOptimization::Reuse : ParentGradientOptimization::Overwrite;
     }
 };
 
@@ -243,8 +226,6 @@ class MinusNode : public BinaryElementWiseNode<ElemType>
     typedef BinaryElementWiseNode<ElemType> Base; UsingBinaryElementwiseNodeBaseMembers;
     static const std::wstring TypeName() { return L"Minus"; }
 
-    bool m_inputsMatchOutput[2];
-
 public:
     DeclareConstructorFromConfigWithNumInputs(MinusNode);
     MinusNode(DEVICEID_TYPE deviceId, const wstring& name)
@@ -286,25 +267,10 @@ public:
             inputGradient.AddCopyOf(gradient, sign);
     }
 
-    virtual void /*ComputationNodeBase::*/ Validate(bool isFinalValidationPass) override
-    {
-        Base::Validate(isFinalValidationPass);
-
-        // check if gradient can be reused
-        for (size_t i = 0; i < GetNumInputs(); i++)
-        {
-            m_inputsMatchOutput[i] =
-                InputRef(i).HasMBLayout() == HasMBLayout() &&
-                InputRef(i).GetSampleLayout() == GetSampleLayout() &&
-                !InputRef(i).NeedsDynamicValidation() &&
-                !NeedsDynamicValidation();
-        }
-    }
-
     virtual ParentGradientOptimization ImplementsGradientOptimization(const ComputationNodeBase* input) const override
     {
         // only left operand can use gradient overwrite optimization
-        return (Input(0).get() == input && m_inputsMatchOutput[0]) ? ParentGradientOptimization::Reuse : ParentGradientOptimization::Overwrite;
+        return (Input(0).get() == input && InputMatchesOutput(0)) ? ParentGradientOptimization::Reuse : ParentGradientOptimization::Overwrite;
     }
 };
 
