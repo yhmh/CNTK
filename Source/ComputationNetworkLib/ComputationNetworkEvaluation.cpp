@@ -1166,8 +1166,8 @@ void ComputationNetwork::AllocateAllMatrices(const std::vector<ComputationNodeBa
             auto parentIter = gradientReuseParentMap.find(parent);
             while (parentIter != gradientReuseParentMap.end())
             {
-                parent = parentIter->first;
-                parentIter = gradientReuseParentMap.find(parentIter->first);
+                parent = parentIter->second;
+                parentIter = gradientReuseParentMap.find(parent);
             }
 
             // add children to the alias group under the root
@@ -1187,6 +1187,19 @@ void ComputationNetwork::AllocateAllMatrices(const std::vector<ComputationNodeBa
 
             compactGradientAliasMap[parent].insert(parent);
             compactGradientAliasRootMap[parent] = parent;
+        }
+
+        // print the memory aliasing info
+        if (TraceLevel() > 0 && compactGradientAliasRootMap.size() > 0)
+        {
+            fprintf(stderr, "\nGradient Memory Aliasing: %d are aliased.\n", (int)compactGradientAliasRootMap.size());
+            for (const auto pair : compactGradientAliasRootMap)
+            {
+                auto child = (const ComputationNodeBase*)pair.first;
+                auto parent = (const ComputationNodeBase*)pair.second;
+                if (child != parent)
+                    fprintf(stderr, "\t%S (gradient) reuses %S (gradient)\n", child->GetName().c_str(), parent->GetName().c_str());
+            }
         }
 
         m_matrixPool.SetAliasInfo(compactGradientAliasMap, compactGradientAliasRootMap);

@@ -84,7 +84,11 @@ public:
         // check if gradient can be reused
         for (size_t i = 0; i < GetNumInputs(); i++)
         {
-            m_inputsMatchOutput[i] = (InputRef(i).HasMBLayout() == HasMBLayout() && InputRef(i).GetSampleLayout() == GetSampleLayout());
+            m_inputsMatchOutput[i] =
+                InputRef(i).HasMBLayout() == HasMBLayout() &&
+                InputRef(i).GetSampleLayout() == GetSampleLayout() &&
+                !InputRef(i).NeedsDynamicValidation() &&
+                !NeedsDynamicValidation();
         }
     }
 
@@ -289,7 +293,11 @@ public:
         // check if gradient can be reused
         for (size_t i = 0; i < GetNumInputs(); i++)
         {
-            m_inputsMatchOutput[i] = (InputRef(i).HasMBLayout() == HasMBLayout() && InputRef(i).GetSampleLayout() == GetSampleLayout());
+            m_inputsMatchOutput[i] =
+                InputRef(i).HasMBLayout() == HasMBLayout() &&
+                InputRef(i).GetSampleLayout() == GetSampleLayout() &&
+                !InputRef(i).NeedsDynamicValidation() &&
+                !NeedsDynamicValidation();
         }
     }
 
