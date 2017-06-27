@@ -1,0 +1,2 @@
+1	../VOCdevkit/VOC2007/JPEGImages/000037.jpg	0
+2	../VOCdevkit/VOC2007/JPEGImages/000038.jpg	0

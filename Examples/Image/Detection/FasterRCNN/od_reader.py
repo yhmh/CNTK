@@ -4,7 +4,15 @@
 # for full license information.
 # ==============================================================================
 
-import cv2
+import zipfile
+
+try:
+    import cv2
+except ImportError:
+    import pip
+    pip.main(['install', '--user', 'opencv-python'])
+    import cv2
+
 import numpy as np
 import os
 import pdb
@@ -14,15 +22,13 @@ class ObjectDetectionReader:
                  pad_width, pad_height, pad_value, randomize=True, max_images=None):
         self._pad_width = pad_width
         self._pad_height = pad_height
-        self._pad_value = np.array([pad_value, pad_value, pad_value])
+        self._pad_value = [pad_value, pad_value, pad_value]
         self._randomize = randomize
         self._img_file_paths = []
         self._gt_annotations = []
-        self._img_stats = []
 
         self._num_images = self._parse_map_files(img_map_file, roi_map_file, max_annotations_per_image, max_images)
-        for i in range(self._num_images):
-            self._scale_and_pad_annotations(i)
+        self._img_stats = [None for _ in range(self._num_images)]
 
         self._reading_order = None
         self._reading_index = -1
@@ -103,14 +109,22 @@ class ObjectDetectionReader:
 
         self._reading_index = 0
 
-    def _scale_and_pad_annotations(self, index):
-        image_path = self._img_file_paths[index]
+    def read_image(self, image_path):
+        if "@" in image_path:
+            at = str.find(image_path, '@')
+            zip_file = image_path[:at]
+            img_name = image_path[(at + 2):]
+            archive = zipfile.ZipFile(zip_file, 'r')
+            imgdata = archive.read(img_name)
+            imgnp = np.array(bytearray(imgdata), dtype=np.uint8)
+            img = cv2.imdecode(imgnp, 1)
+        else:
+            img = cv2.imread(image_path)
+
+        return img
+
+    def _prepare_annotations_and_image_stats(self, index, img_width, img_height):
         annotations = self._gt_annotations[index]
-
-        img = cv2.imread(image_path)
-        img_width = len(img[0])
-        img_height = len(img)
-
         do_scale_w = img_width > img_height
         target_w = self._pad_width
         target_h = self._pad_height
@@ -139,15 +153,22 @@ class ObjectDetectionReader:
 
         # keep image stats for scaling and padding images later
         img_stats = [target_w, target_h, img_width, img_height, top, bottom, left, right]
-        self._img_stats.append(img_stats)
+        self._img_stats[index] = img_stats
 
     def _load_resize_and_pad_image(self, index):
         image_path = self._img_file_paths[index]
+
+        img = self.read_image(image_path)
+        if self._img_stats[index] is None:
+            img_width = len(img[0])
+            img_height = len(img)
+            self._prepare_annotations_and_image_stats(index, img_width, img_height)
+
         target_w, target_h, img_width, img_height, top, bottom, left, right = self._img_stats[index]
 
-        img = cv2.imread(image_path)
         resized = cv2.resize(img, (target_w, target_h), 0, 0, interpolation=cv2.INTER_NEAREST)
-        resized_with_pad = cv2.copyMakeBorder(resized, top, bottom, left, right, cv2.BORDER_CONSTANT, self._pad_value)
+        resized_with_pad = cv2.copyMakeBorder(resized, top, bottom, left, right, cv2.BORDER_CONSTANT,
+                                              value=self._pad_value)
 
         # transpose(2,0,1) converts the image to the HWC format which CNTK accepts
         model_arg_rep = np.ascontiguousarray(np.array(resized_with_pad, dtype=np.float32).transpose(2, 0, 1))

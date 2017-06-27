@@ -27,11 +27,11 @@ def evaluate_detections(all_boxes, all_gt_infos, classes, use_07_metric=False, a
     '''
 
     if apply_mms:
-        print ("Number of rois before non-maximum surpression: %d" % sum([len(all_boxes[i][j]) for i in range(len(all_boxes)) for j in range(len(all_boxes[0]))]))
+        print ("Number of rois before non-maximum suppression: %d" % sum([len(all_boxes[i][j]) for i in range(len(all_boxes)) for j in range(len(all_boxes[0]))]))
         nms_dets,_ = apply_nms_to_test_set_results(all_boxes, nms_threshold, conf_threshold)
-        print ("Number of rois  after non-maximum surpression: %d" % sum([len(nms_dets[i][j]) for i in range(len(all_boxes)) for j in range(len(all_boxes[0]))]))
+        print ("Number of rois  after non-maximum suppression: %d" % sum([len(nms_dets[i][j]) for i in range(len(all_boxes)) for j in range(len(all_boxes[0]))]))
     else:
-        print ("Skipping non-maximum surpression")
+        print ("Skipping non-maximum suppression")
         nms_dets = all_boxes
 
     aps = {}

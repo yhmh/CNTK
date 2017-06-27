@@ -17,6 +17,8 @@ try:
 except ImportError:
     from utils.default_config import cfg
 
+import pdb
+
 def nms(dets, thresh, force_cpu=False):
     '''
     Dispatches the call to either CPU or GPU NMS implementations
@@ -92,6 +94,7 @@ def apply_nms_to_test_set_results(all_boxes, nms_threshold, conf_threshold):
 
             # also filter out low confidences
             if conf_threshold > 0:
+                #pdb.set_trace()
                 keep_conf_idx = np.where(dets[:, -1] > conf_threshold)
                 keep = list(set(keep_conf_idx[0]).intersection(keep))
 

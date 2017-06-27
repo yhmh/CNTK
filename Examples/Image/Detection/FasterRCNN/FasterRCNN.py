@@ -42,9 +42,9 @@ sys.path.append(os.path.join(abs_path, ".."))
 from utils.rpn.rpn_helpers import create_rpn, create_proposal_target_layer
 from utils.rpn.cntk_smoothL1_loss import SmoothL1Loss
 from utils.map.map_helpers import evaluate_detections
-from cntk_helpers import regress_rois
 from config import cfg
 from od_mb_source import ObjectDetectionMinibatchSource
+from cntk_helpers import regress_rois
 
 ###############################################################
 ###############################################################
@@ -106,8 +106,34 @@ def parse_arguments():
                         action='store_true')
     parser.add_argument('-device', '--device', type=int, help="Force to run the script on a specified device",
                         required=False, default=None)
+    parser.add_argument('-rpnLrFactor', '--rpnLrFactor', type=float, help="Scale factor for rpn lr schedule", required=False, default=1.0)
+    parser.add_argument('-frcnLrFactor', '--frcnLrFactor', type=float, help="Scale factor for frcn lr schedule", required=False, default=1.0)
+    parser.add_argument('-momentumPerMb', '--momentumPerMb', type=float, help="momentum per minibatch", required=False)
+    parser.add_argument('-rpnEpochs', '--rpnEpochs', type=int, help="number of epochs for rpn training", required=False)
+    parser.add_argument('-frcnEpochs', '--frcnEpochs', type=int, help="number of epochs for frcn training", required=False)
+    parser.add_argument('-rndSeed', '--rndSeed', type=int, help="the random seed", required=False)
 
     args = vars(parser.parse_args())
+
+    # set and overwrite learning parameters
+    globalvars['rnd_seed'] = cfg.RNG_SEED
+    globalvars['rpn_lr_factor'] = 1.0
+    globalvars['frcn_lr_factor'] = 1.0
+    globalvars['momentum_per_mb'] = cfg["CNTK"].MOMENTUM_PER_MB
+    globalvars['rpn_epochs'] = 1 if cfg["CNTK"].FAST_MODE else cfg["CNTK"].RPN_EPOCHS
+    globalvars['frcn_epochs'] = 1 if cfg["CNTK"].FAST_MODE else cfg["CNTK"].FRCN_EPOCHS
+    if args['rndSeed'] is not None:
+        globalvars['rnd_seed'] = args['rndSeed']
+    if args['rpnLrFactor'] is not None:
+        globalvars['rpn_lr_factor'] = args['rpnLrFactor']
+    if args['frcnLrFactor'] is not None:
+        globalvars['frcn_lr_factor'] = args['frcnLrFactor']
+    if args['momentumPerMb'] is not None:
+        globalvars['momentum_per_mb'] = args['momentumPerMb']
+    if args['rpnEpochs'] is not None:
+        globalvars['rpn_epochs'] = args['rpnEpochs']
+    if args['frcnEpochs'] is not None:
+        globalvars['frcn_epochs'] = args['frcnEpochs']
 
     if args['outputdir'] is not None:
         globalvars['output_path'] = args['outputdir']
@@ -130,6 +156,15 @@ def parse_arguments():
     globalvars['test_map_file'] = os.path.join(data_path, globalvars['test_map_file'])
     globalvars['train_roi_file'] = os.path.join(data_path, globalvars['train_roi_file'])
     globalvars['test_roi_file'] = os.path.join(data_path, globalvars['test_roi_file'])
+
+    # report args
+    print("Using the following parameters:")
+    print("Random seed    : {}".format(globalvars['rnd_seed']))
+    print("RPN lr factor  : {}".format(globalvars['rpn_lr_factor']))
+    print("RPN epochs     : {}".format(globalvars['rpn_epochs']))
+    print("FRCN lr factor : {}".format(globalvars['frcn_lr_factor']))
+    print("FRCN epochs    : {}".format(globalvars['frcn_epochs']))
+    print("Momentum per MB: {}".format(globalvars['momentum_per_mb']))
 
 ###############################################################
 ###############################################################
@@ -351,12 +386,18 @@ def train_faster_rcnn_alternating(debug_output=False):
     '''
 
     # Learning parameters
+    rpn_lr_factor = globalvars['rpn_lr_factor']
+    rpn_lr_per_sample_scaled = [x * rpn_lr_factor for x in cfg["CNTK"].RPN_LR_PER_SAMPLE]
+    rpn_lr_schedule = learning_rate_schedule(rpn_lr_per_sample_scaled, unit=UnitType.sample)
+
+    frcn_lr_factor = globalvars['frcn_lr_factor']
+    frcn_lr_per_sample_scaled = [x * frcn_lr_factor for x in cfg["CNTK"].FRCN_LR_PER_SAMPLE]
+    frcn_lr_schedule = learning_rate_schedule(frcn_lr_per_sample_scaled, unit=UnitType.sample)
+
     l2_reg_weight = cfg["CNTK"].L2_REG_WEIGHT
-    mm_schedule = momentum_schedule(cfg["CNTK"].MOMENTUM_PER_MB)
-    rpn_epochs = 1 if cfg["CNTK"].FAST_MODE else cfg["CNTK"].RPN_EPOCHS
-    rpn_lr_schedule = learning_rate_schedule(cfg["CNTK"].RPN_LR_PER_SAMPLE, unit=UnitType.sample)
-    frcn_epochs = 1 if cfg["CNTK"].FAST_MODE else cfg["CNTK"].FRCN_EPOCHS
-    frcn_lr_schedule = learning_rate_schedule(cfg["CNTK"].FRCN_LR_PER_SAMPLE, unit=UnitType.sample)
+    mm_schedule = momentum_schedule(globalvars['momentum_per_mb'])
+    rpn_epochs = globalvars['rpn_epochs']
+    frcn_epochs = globalvars['frcn_epochs']
 
     # Input variables denoting features and labeled ground truth rois (as 5-tuples per roi)
     image_input = input_variable((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()],
@@ -370,11 +411,9 @@ def train_faster_rcnn_alternating(debug_output=False):
     # base image classification model (e.g. VGG16 or AlexNet)
     base_model = load_model(base_model_file)
 
-    print("Using base model: {}".format(cfg["CNTK"].BASE_MODEL))
-    print("rpn_lr_per_sample: {}".format(cfg["CNTK"].RPN_LR_PER_SAMPLE))
-    print("rpn_epochs: {}".format(rpn_epochs))
-    print("frcn_lr_per_sample: {}".format(cfg["CNTK"].FRCN_LR_PER_SAMPLE))
-    print("frcn_epochs: {}".format(frcn_epochs))
+    print("Using base model:   {}".format(cfg["CNTK"].BASE_MODEL))
+    print("rpn_lr_per_sample:  {}".format(rpn_lr_per_sample_scaled))
+    print("frcn_lr_per_sample: {}".format(frcn_lr_per_sample_scaled))
     if debug_output:
         print("Storing graphs and models to %s." % globalvars['output_path'])
 
@@ -619,7 +658,6 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
 # The main method trains and evaluates a Fast R-CNN model.
 # If a trained model is already available it is loaded an no training will be performed.
 if __name__ == '__main__':
-    np.random.seed(seed=23)
     if os.path.exists(map_file_path):
         os.chdir(map_file_path)
         if not os.path.exists(os.path.join(abs_path, "Output")):
@@ -628,6 +666,7 @@ if __name__ == '__main__':
             os.makedirs(os.path.join(abs_path, "Output", cfg["CNTK"].DATASET))
 
     parse_arguments()
+    np.random.seed(seed=globalvars['rnd_seed'])
     model_path = os.path.join(globalvars['output_path'], "faster_rcnn_eval_{}_{}.model"
                               .format(cfg["CNTK"].BASE_MODEL, "e2e" if cfg["CNTK"].TRAIN_E2E else "4stage"))
 
@@ -656,7 +695,7 @@ if __name__ == '__main__':
 
     # Plot results on test set
     if cfg["CNTK"].VISUALIZE_RESULTS:
-        from cntk_helpers import eval_and_plot_faster_rcnn
+        from plot_helpers import eval_and_plot_faster_rcnn
         num_eval = min(num_test_images, 100)
         img_shape = (num_channels, image_height, image_width)
         results_folder = os.path.join(globalvars['output_path'], cfg["CNTK"].DATASET)

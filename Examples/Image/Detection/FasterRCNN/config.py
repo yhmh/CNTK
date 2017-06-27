@@ -115,12 +115,12 @@ if __C.CNTK.DATASET == "Overfit":
                         'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable',
                         'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor')
     __C.CNTK.MAP_FILE_PATH = "../../DataSets/Pascal/mappings"
-    __C.CNTK.TRAIN_MAP_FILE = "test2007.txt"
-    __C.CNTK.TRAIN_ROI_FILE = "test2007_rois_abs-xyxy_pad.txt"
-    __C.CNTK.TEST_MAP_FILE = "test2007.txt"
-    __C.CNTK.TEST_ROI_FILE = "test2007_rois_abs-xyxy_pad.txt"
-    __C.CNTK.NUM_TRAIN_IMAGES = 1 #5010
-    __C.CNTK.NUM_TEST_IMAGES = 1 #4952
+    __C.CNTK.TRAIN_MAP_FILE = "overfit.txt"
+    __C.CNTK.TRAIN_ROI_FILE = "overfit_rois_abs-xyxy_pad.txt"
+    __C.CNTK.TEST_MAP_FILE = "overfit.txt"
+    __C.CNTK.TEST_ROI_FILE = "overfit_rois_abs-xyxy_pad.txt"
+    __C.CNTK.NUM_TRAIN_IMAGES = 2
+    __C.CNTK.NUM_TEST_IMAGES = 2
     __C.CNTK.PROPOSAL_LAYER_PARAMS = "'feat_stride': 16\n'scales':\n - 8 \n - 16 \n - 32"
 
 #
