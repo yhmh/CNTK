@@ -85,7 +85,7 @@ public:
         if (i == GetNumInputs())
             LogicError("Cannot find input.");
 
-        return InputMatchesOutput(i) ? ParentGradientOptimization::Reuse : ParentGradientOptimization::Overwrite;
+        return this->InputMatchesOutput(i) ? ParentGradientOptimization::Reuse : ParentGradientOptimization::Overwrite;
     }
 };
 
@@ -270,7 +270,7 @@ public:
     virtual ParentGradientOptimization ImplementsGradientOptimization(const ComputationNodeBase* input) const override
     {
         // only left operand can use gradient overwrite optimization
-        return (Input(0).get() == input && InputMatchesOutput(0)) ? ParentGradientOptimization::Reuse : ParentGradientOptimization::Overwrite;
+        return (Input(0).get() == input && this->InputMatchesOutput(0)) ? ParentGradientOptimization::Reuse : ParentGradientOptimization::Overwrite;
     }
 };
 
