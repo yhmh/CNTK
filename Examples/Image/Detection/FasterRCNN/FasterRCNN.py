@@ -112,11 +112,13 @@ def parse_arguments():
     parser.add_argument('-rpnEpochs', '--rpnEpochs', type=int, help="number of epochs for rpn training", required=False)
     parser.add_argument('-frcnEpochs', '--frcnEpochs', type=int, help="number of epochs for frcn training", required=False)
     parser.add_argument('-rndSeed', '--rndSeed', type=int, help="the random seed", required=False)
+    parser.add_argument('-trainConv', '--trainConv', type=int, help="whether to train conv layers", required=False)
 
     args = vars(parser.parse_args())
 
     # set and overwrite learning parameters
     globalvars['rnd_seed'] = cfg.RNG_SEED
+    globalvars['train_conv'] = cfg["CNTK"].TRAIN_CONV_LAYERS
     globalvars['rpn_lr_factor'] = 1.0
     globalvars['frcn_lr_factor'] = 1.0
     globalvars['momentum_per_mb'] = cfg["CNTK"].MOMENTUM_PER_MB
@@ -124,6 +126,8 @@ def parse_arguments():
     globalvars['frcn_epochs'] = 1 if cfg["CNTK"].FAST_MODE else cfg["CNTK"].FRCN_EPOCHS
     if args['rndSeed'] is not None:
         globalvars['rnd_seed'] = args['rndSeed']
+    if args['trainConv'] is not None:
+        globalvars['train_conv'] = True if args['trainConv']==1 else False
     if args['rpnLrFactor'] is not None:
         globalvars['rpn_lr_factor'] = args['rpnLrFactor']
     if args['frcnLrFactor'] is not None:
@@ -159,12 +163,13 @@ def parse_arguments():
 
     # report args
     print("Using the following parameters:")
-    print("Random seed    : {}".format(globalvars['rnd_seed']))
-    print("RPN lr factor  : {}".format(globalvars['rpn_lr_factor']))
-    print("RPN epochs     : {}".format(globalvars['rpn_epochs']))
-    print("FRCN lr factor : {}".format(globalvars['frcn_lr_factor']))
-    print("FRCN epochs    : {}".format(globalvars['frcn_epochs']))
-    print("Momentum per MB: {}".format(globalvars['momentum_per_mb']))
+    print("Train conv layers: {}".format(globalvars['train_conv']))
+    print("Random seed      : {}".format(globalvars['rnd_seed']))
+    print("RPN lr factor    : {}".format(globalvars['rpn_lr_factor']))
+    print("RPN epochs       : {}".format(globalvars['rpn_epochs']))
+    print("FRCN lr factor   : {}".format(globalvars['frcn_lr_factor']))
+    print("FRCN epochs      : {}".format(globalvars['frcn_epochs']))
+    print("Momentum per MB  : {}".format(globalvars['momentum_per_mb']))
 
 ###############################################################
 ###############################################################
@@ -349,7 +354,7 @@ def train_faster_rcnn_e2e(debug_output=False):
     dims_input = input_variable((6), dynamic_axes=[Axis.default_batch_axis()])
 
     # Instantiate the Faster R-CNN prediction model and loss function
-    predictions, loss, pred_error = create_faster_rcnn_predictor(image_input, roi_input)
+    predictions, loss, pred_error = create_faster_rcnn_predictor(image_input, roi_input, dims_input)
 
     if debug_output:
         print("Storing graphs and models to %s." % globalvars['output_path'])
@@ -426,7 +431,7 @@ def train_faster_rcnn_alternating(debug_output=False):
             # frcn: -                   -
 
         # conv layers
-        if start_train_conv_node_name == None:
+        if not globalvars['train_conv']:
             conv_layers = clone_model(base_model, [feature_node_name], [last_conv_node_name], clone_method=CloneMethod.freeze)
             conv_out = conv_layers(feat_norm)
         else:
@@ -457,7 +462,7 @@ def train_faster_rcnn_alternating(debug_output=False):
             # frcn: base_model + new    yes
 
         # conv_layers
-        if start_train_conv_node_name == None:
+        if not globalvars['train_conv']:
             conv_layers = clone_model(base_model, [feature_node_name], [last_conv_node_name], CloneMethod.freeze)
             conv_out = conv_layers(feat_norm)
         else:

@@ -158,6 +158,7 @@ class AnchorTargetLayer(UserFunction):
         anchors = all_anchors[inds_inside, :]
         if DEBUG:
             print ('anchors.shape', anchors.shape)
+            print('gt_boxes.shape', gt_boxes.shape)
 
         # label: 1 is positive, 0 is negative, -1 is dont care
         labels = np.empty((len(inds_inside), ), dtype=np.float32)

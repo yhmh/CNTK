@@ -39,6 +39,7 @@ __C.CNTK.TRAIN_E2E = False
 __C.CNTK.DEBUG_OUTPUT = True
 __C.CNTK.USE_MEAN_GRADIENT = False
 __C.CNTK.USE_PYTHON_READER = True
+__C.CNTK.TRAIN_CONV_LAYERS = False
 
 __C.CNTK.DATASET = "Grocery" # "Grocery" or "Pascal" ("Overfit")
 __C.CNTK.BASE_MODEL = "AlexNet" # "VGG16" or "AlexNet"
@@ -90,9 +91,6 @@ if __C.CNTK.DATASET == "Grocery":
     __C.CNTK.TEST_MAP_FILE = "test_img_file.txt"
     __C.CNTK.TRAIN_ROI_FILE = "train_roi_file.txt"
     __C.CNTK.TEST_ROI_FILE = "test_roi_file.txt"
-    if not __C.CNTK.USE_PYTHON_READER:
-        __C.CNTK.TRAIN_ROI_FILE = "train_roi_file_relative.txt"
-        __C.CNTK.TEST_ROI_FILE = "test_roi_file_relative.txt"
     __C.CNTK.NUM_TRAIN_IMAGES = 20
     __C.CNTK.NUM_TEST_IMAGES = 5
     __C.CNTK.PROPOSAL_LAYER_PARAMS = "'feat_stride': 16\n'scales':\n - 4 \n - 8 \n - 12"
@@ -131,7 +129,7 @@ if __C.CNTK.BASE_MODEL == "AlexNet":
     __C.CNTK.BASE_MODEL_FILE = "AlexNet.model"
     __C.CNTK.FEATURE_NODE_NAME = "features"
     __C.CNTK.LAST_CONV_NODE_NAME = "conv5.y"
-    __C.CNTK.START_TRAIN_CONV_NODE_NAME = None # "conv3.y"
+    __C.CNTK.START_TRAIN_CONV_NODE_NAME = "conv3.y"
     __C.CNTK.POOL_NODE_NAME = "pool3"
     __C.CNTK.LAST_HIDDEN_NODE_NAME = "h2_d"
     __C.CNTK.ROI_DIM = 6
@@ -140,7 +138,7 @@ if __C.CNTK.BASE_MODEL == "VGG16":
     __C.CNTK.BASE_MODEL_FILE = "VGG16_ImageNet.cntkmodel"
     __C.CNTK.FEATURE_NODE_NAME = "data"
     __C.CNTK.LAST_CONV_NODE_NAME = "conv5_3"
-    __C.CNTK.START_TRAIN_CONV_NODE_NAME = None  # "conv3_1"
+    __C.CNTK.START_TRAIN_CONV_NODE_NAME = "conv3_1"
     __C.CNTK.POOL_NODE_NAME = "pool5"
     __C.CNTK.LAST_HIDDEN_NODE_NAME = "drop7"
     __C.CNTK.ROI_DIM = 7
