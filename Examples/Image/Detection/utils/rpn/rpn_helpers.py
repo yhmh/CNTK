@@ -21,7 +21,7 @@ except ImportError:
     from utils.default_config import cfg
 
 def create_rpn(conv_out, scaled_gt_boxes, im_info, add_loss_functions=True,
-               proposal_layer_param_string=None):
+               proposal_layer_param_string=None, conv_bias_init=0.1):
     '''
     Creates a region proposal network for object detection as proposed in the "Faster R-CNN" paper:
         Shaoqing Ren and Kaiming He and Ross Girshick and Jian Sun:
@@ -47,11 +47,11 @@ def create_rpn(conv_out, scaled_gt_boxes, im_info, add_loss_functions=True,
     # RPN network
     # init = 'normal', initValueScale = 0.01, initBias = 0.1
     rpn_conv_3x3 = Convolution((3, 3), 256, activation=relu, pad=True, strides=1,
-                                init = normal(scale=0.01), init_bias=0.1)(conv_out)
+                                init = normal(scale=0.01), init_bias=conv_bias_init)(conv_out)
     rpn_cls_score = Convolution((1, 1), 18, activation=None, name="rpn_cls_score",
-                                init = normal(scale=0.01), init_bias=0.1)(rpn_conv_3x3)  # 2(bg/fg)  * 9(anchors)
+                                init = normal(scale=0.01), init_bias=conv_bias_init)(rpn_conv_3x3)  # 2(bg/fg)  * 9(anchors)
     rpn_bbox_pred = Convolution((1, 1), 36, activation=None, name="rpn_bbox_pred",
-                                init = normal(scale=0.01), init_bias=0.1)(rpn_conv_3x3)  # 4(coords) * 9(anchors)
+                                init = normal(scale=0.01), init_bias=conv_bias_init)(rpn_conv_3x3)  # 4(coords) * 9(anchors)
 
     # apply softmax to get (bg, fg) probabilities and reshape predictions back to grid of (18, H, W)
     num_predictions = int(np.prod(rpn_cls_score.shape) / 2)

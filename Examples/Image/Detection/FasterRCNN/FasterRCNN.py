@@ -57,6 +57,11 @@ num_channels = 3
 dims_input_const = MinibatchData(Value(batch=np.asarray(
     [image_width, image_height, image_width, image_height, image_width, image_height], dtype=np.float32)), 1, 1, False)
 
+#input = minus(feature_var, constant([[[104]], [[117]], [[124]]]), name='mean_removed_input')
+img_pad_value = [104, 117, 124] if cfg["CNTK"].BASE_MODEL == "VGG16" else [114, 114, 114]
+normalization_const = Constant([[[104]], [[117]], [[124]]]) if cfg["CNTK"].BASE_MODEL == "VGG16" else Constant(114)
+
+
 globalvars = {}
 globalvars['output_path'] = os.path.join(abs_path, "Output")
 
@@ -226,12 +231,13 @@ def create_faster_rcnn_predictor(features, scaled_gt_boxes, dims_input):
     fc_layers = clone_model(base_model, [pool_node_name], [last_hidden_node_name], clone_method=CloneMethod.clone)
 
     # Normalization and conv layers
-    feat_norm = features - Constant(114)
+    feat_norm = features - normalization_const
     conv_out = conv_layers(feat_norm)
 
     # RPN
     rpn_rois, rpn_losses = create_rpn(conv_out, scaled_gt_boxes, dims_input,
-                                      proposal_layer_param_string=cfg["CNTK"].PROPOSAL_LAYER_PARAMS)
+                                      proposal_layer_param_string=cfg["CNTK"].PROPOSAL_LAYER_PARAMS,
+                                      conv_bias_init=cfg["CNTK"].CONV_BIAS_INIT)
     rois, label_targets, bbox_targets, bbox_inside_weights = \
         create_proposal_target_layer(rpn_rois, scaled_gt_boxes, num_classes=num_classes)
 
@@ -322,7 +328,7 @@ def train_model_using_python_reader(image_input, roi_input, dims_input, trainer,
     od_minibatch_source = ObjectDetectionMinibatchSource(
         globalvars['train_map_file'], globalvars['train_roi_file'],
         max_annotations_per_image=cfg["CNTK"].INPUT_ROIS_PER_IMAGE,
-        pad_width=image_width, pad_height=image_height, pad_value=114,
+        pad_width=image_width, pad_height=image_height, pad_value=img_pad_value,
         max_images=cfg["CNTK"].NUM_TRAIN_IMAGES)
 
     # define mapping from reader streams to network inputs
@@ -410,7 +416,7 @@ def train_faster_rcnn_alternating(debug_output=False):
     roi_input = input_variable((cfg["CNTK"].INPUT_ROIS_PER_IMAGE, 5), dynamic_axes=[Axis.default_batch_axis()])
     dims_input = input_variable((6), dynamic_axes=[Axis.default_batch_axis()])
     dims_node = alias(dims_input, name='dims_input')
-    feat_norm = image_input - Constant(114)
+    feat_norm = image_input - normalization_const
     scaled_gt_boxes = alias(roi_input, name='roi_input')
 
     # base image classification model (e.g. VGG16 or AlexNet)
@@ -445,7 +451,8 @@ def train_faster_rcnn_alternating(debug_output=False):
 
         # RPN and losses
         rpn_rois, rpn_losses = create_rpn(conv_out, scaled_gt_boxes, dims_node,
-                                          proposal_layer_param_string=cfg["CNTK"].PROPOSAL_LAYER_PARAMS)
+                                          proposal_layer_param_string=cfg["CNTK"].PROPOSAL_LAYER_PARAMS,
+                                          conv_bias_init=cfg["CNTK"].CONV_BIAS_INIT)
         stage1_rpn_network = combine([rpn_rois, rpn_losses])
 
         # train
@@ -460,6 +467,8 @@ def train_faster_rcnn_alternating(debug_output=False):
             # conv: base_model          only conv3_1 and up
             # rpn:  stage1a rpn model   no
             # frcn: base_model + new    yes
+        # !!! NOTE: in caffe the proposals are generated once and read from file, i.e. they are not affected by conv layer trainine
+        # !!! NOTE: the final rpn in stage 1a uses adapted conv layers. Now here the conv weight are set back to the base model
 
         # conv_layers
         if not globalvars['train_conv']:
@@ -565,7 +574,7 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
         minibatch_source = ObjectDetectionMinibatchSource(
             img_map_file, roi_map_file,
             max_annotations_per_image=cfg["CNTK"].INPUT_ROIS_PER_IMAGE,
-            pad_width=image_width, pad_height=image_height, pad_value=114, randomize=False,
+            pad_width=image_width, pad_height=image_height, pad_value=img_pad_value, randomize=False,
             max_images=cfg["CNTK"].NUM_TEST_IMAGES)
 
         # define mapping from reader streams to network inputs
@@ -584,8 +593,8 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
             roi_input: minibatch_source[cfg["CNTK"].ROI_STREAM_NAME],
         }
 
-    img_key = "features"
-    roi_key = "[50 x 5]"
+    img_key = cfg["CNTK"].FEATURE_NODE_NAME
+    roi_key = "x 5]"
     dims_key = "[6]"
 
     # all detections are collected into:
@@ -629,6 +638,7 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
 
         fkeys = [k for k in mb_data if img_key in str(k)]
         dkeys = [k for k in mb_data if dims_key in str(k)]
+
         output = frcn_eval.eval({fkeys[0]: mb_data[fkeys[0]], dkeys[0]: mb_data[dkeys[0]]})
         out_dict = dict([(k.name, k) for k in output])
         out_cls_pred = output[out_dict['cls_pred']][0]                      # (300, 17)
@@ -652,7 +662,9 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
             print("Processed {} samples".format(img_i+1))
 
     # calculate mAP
-    aps = evaluate_detections(all_boxes, all_gt_infos, classes, nms_threshold=cfg["CNTK"].RESULTS_NMS_THRESHOLD)
+    aps = evaluate_detections(all_boxes, all_gt_infos, classes,
+                              nms_threshold=cfg["CNTK"].RESULTS_NMS_THRESHOLD,
+                              conf_threshold = cfg["CNTK"].RESULTS_NMS_CONF_THRESHOLD)
     ap_list = []
     for class_name in aps:
         ap_list += [aps[class_name]]
@@ -709,5 +721,6 @@ if __name__ == '__main__':
                                   drawUnregressedRois=cfg["CNTK"].DRAW_UNREGRESSED_ROIS,
                                   drawNegativeRois=cfg["CNTK"].DRAW_NEGATIVE_ROIS,
                                   nmsThreshold=cfg["CNTK"].RESULTS_NMS_THRESHOLD,
-                                  decisionThreshold=cfg["CNTK"].RESULTS_CONF_THRESHOLD)
+                                  nmsConfThreshold=cfg["CNTK"].RESULTS_NMS_CONF_THRESHOLD,
+                                  bgrPlotThreshold=cfg["CNTK"].RESULTS_BGR_PLOT_THRESHOLD)
 

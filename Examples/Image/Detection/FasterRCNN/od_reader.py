@@ -17,12 +17,17 @@ import numpy as np
 import os
 import pdb
 
+DEBUG = False
+if DEBUG:
+    import matplotlib.pyplot as mp
+
+
 class ObjectDetectionReader:
     def __init__(self, img_map_file, roi_map_file, max_annotations_per_image,
                  pad_width, pad_height, pad_value, randomize=True, max_images=None):
         self._pad_width = pad_width
         self._pad_height = pad_height
-        self._pad_value = [pad_value, pad_value, pad_value]
+        self._pad_value = pad_value
         self._randomize = randomize
         self._img_file_paths = []
         self._gt_annotations = []
@@ -43,10 +48,30 @@ class ObjectDetectionReader:
         '''
 
         index = self._get_next_image_index()
+        #img_data, img_dims, resized_with_pad = self._load_resize_and_pad_image(index)
         img_data, img_dims = self._load_resize_and_pad_image(index)
         roi_data = self._gt_annotations[index]
 
+        if DEBUG:
+            self._debug_plot(resized_with_pad, roi_data)
+
         return img_data, roi_data, img_dims
+
+    def _debug_plot(self, img_data, roi_data):
+        color = (0, 255, 0)
+        thickness = 2
+        for rect in roi_data:
+            pt1 = tuple([int(float(x)) for x in rect[0:2]])
+            pt2 = tuple([int(float(x)) for x in rect[2:4]])
+            try:
+                cv2.rectangle(img_data, pt1, pt2, color, thickness)
+            except:
+                pdb.set_trace()
+                print("Unexpected error:", sys.exc_info()[0])
+
+        mp.imshow(img_data)
+        mp.plot()
+        mp.show()
 
     def sweep_end(self):
         return self._reading_index >= self._num_images
@@ -128,6 +153,7 @@ class ObjectDetectionReader:
         do_scale_w = img_width > img_height
         target_w = self._pad_width
         target_h = self._pad_height
+
         if do_scale_w:
             scale_factor = float(self._pad_width) / float(img_width)
             target_h = int(np.round(img_height * scale_factor))
@@ -175,4 +201,4 @@ class ObjectDetectionReader:
 
         # dims = pad_width, pad_height, scaled_image_width, scaled_image_height, orig_img_width, orig_img_height
         dims = (self._pad_width, self._pad_height, target_w, target_h, img_width, img_height)
-        return model_arg_rep, dims
+        return model_arg_rep, dims #, resized_with_pad

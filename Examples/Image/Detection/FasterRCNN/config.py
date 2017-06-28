@@ -43,6 +43,7 @@ __C.CNTK.TRAIN_CONV_LAYERS = False
 
 __C.CNTK.DATASET = "Grocery" # "Grocery" or "Pascal" ("Overfit")
 __C.CNTK.BASE_MODEL = "AlexNet" # "VGG16" or "AlexNet"
+__C.CNTK.CONV_BIAS_INIT = 0.0
 
 # Learning parameters
 __C.CNTK.L2_REG_WEIGHT = 0.0005
@@ -55,19 +56,24 @@ __C.CNTK.E2E_MAX_EPOCHS = 20
 __C.CNTK.E2E_LR_PER_SAMPLE = [0.00001] * 10 + [0.000001] * 10 + [0.000001]
 
 # caffe rpn training: lr = [0.001] * 12 + [0.0001] * 4, momentum = 0.9, weight decay = 0.0005 (cf. stage1_rpn_solver60k80k.pt)
-__C.CNTK.RPN_EPOCHS = 6
-__C.CNTK.RPN_LR_PER_SAMPLE = [0.002] * 4 + [0.001] * 4 + [0.0005] * 4 + [0.0001] * 4
+__C.CNTK.RPN_EPOCHS = 16
+__C.CNTK.RPN_LR_PER_SAMPLE = [0.001] * 12 + [0.0001] * 4
+#__C.CNTK.RPN_EPOCHS = 6
+#__C.CNTK.RPN_LR_PER_SAMPLE = [0.002] * 4 + [0.001] * 2
 
 # caffe frcn training: lr = [0.001] * 6 + [0.0001] * 2, momentum = 0.9, weight decay = 0.0005 (cf. stage1_fast_rcnn_solver30k40k.pt)
-__C.CNTK.FRCN_EPOCHS = 20
-__C.CNTK.FRCN_LR_PER_SAMPLE = [0.00001] * 8 + [0.000005] * 6 + [0.000001] * 6
+__C.CNTK.FRCN_EPOCHS = 8
+__C.CNTK.FRCN_LR_PER_SAMPLE = [0.001] * 6 + [0.0001] * 2
+#__C.CNTK.FRCN_EPOCHS = 20
+#__C.CNTK.FRCN_LR_PER_SAMPLE = [0.00001] * 8 + [0.000005] * 6 + [0.000001] * 6
 
 __C.CNTK.INPUT_ROIS_PER_IMAGE = 50
 __C.CNTK.IMAGE_WIDTH = 1000
 __C.CNTK.IMAGE_HEIGHT = 1000
 
 __C.CNTK.RESULTS_NMS_THRESHOLD = 0.3
-__C.CNTK.RESULTS_CONF_THRESHOLD = 0.7
+__C.CNTK.RESULTS_NMS_CONF_THRESHOLD = 0.5
+__C.CNTK.RESULTS_BGR_PLOT_THRESHOLD = 0.01
 
 __C.CNTK.GRAPH_TYPE = "png" # "png" or "pdf"
 __C.CNTK.VISUALIZE_RESULTS = True
@@ -101,9 +107,9 @@ if __C.CNTK.DATASET == "Pascal":
                         'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor')
     __C.CNTK.MAP_FILE_PATH = "../../DataSets/Pascal/mappings"
     __C.CNTK.TRAIN_MAP_FILE = "trainval2007.txt"
-    __C.CNTK.TRAIN_ROI_FILE = "trainval2007_rois_abs-xyxy_pad.txt"
+    __C.CNTK.TRAIN_ROI_FILE = "trainval2007_rois_abs-xyxy_noPad.txt"
     __C.CNTK.TEST_MAP_FILE = "test2007.txt"
-    __C.CNTK.TEST_ROI_FILE = "test2007_rois_abs-xyxy_pad.txt"
+    __C.CNTK.TEST_ROI_FILE = "test2007_rois_abs-xyxy_noPad.txt"
     __C.CNTK.NUM_TRAIN_IMAGES = 5010
     __C.CNTK.NUM_TEST_IMAGES = 4952
     __C.CNTK.PROPOSAL_LAYER_PARAMS = "'feat_stride': 16\n'scales':\n - 8 \n - 16 \n - 32"
@@ -114,9 +120,9 @@ if __C.CNTK.DATASET == "Overfit":
                         'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor')
     __C.CNTK.MAP_FILE_PATH = "../../DataSets/Pascal/mappings"
     __C.CNTK.TRAIN_MAP_FILE = "overfit.txt"
-    __C.CNTK.TRAIN_ROI_FILE = "overfit_rois_abs-xyxy_pad.txt"
+    __C.CNTK.TRAIN_ROI_FILE = "overfit_rois_abs-xyxy_noPad.txt"
     __C.CNTK.TEST_MAP_FILE = "overfit.txt"
-    __C.CNTK.TEST_ROI_FILE = "overfit_rois_abs-xyxy_pad.txt"
+    __C.CNTK.TEST_ROI_FILE = "overfit_rois_abs-xyxy_noPad.txt"
     __C.CNTK.NUM_TRAIN_IMAGES = 2
     __C.CNTK.NUM_TEST_IMAGES = 2
     __C.CNTK.PROPOSAL_LAYER_PARAMS = "'feat_stride': 16\n'scales':\n - 8 \n - 16 \n - 32"
@@ -135,7 +141,7 @@ if __C.CNTK.BASE_MODEL == "AlexNet":
     __C.CNTK.ROI_DIM = 6
 
 if __C.CNTK.BASE_MODEL == "VGG16":
-    __C.CNTK.BASE_MODEL_FILE = "VGG16_ImageNet.cntkmodel"
+    __C.CNTK.BASE_MODEL_FILE = "VGG16_ImageNet_Caffe.model" # "VGG16_ImageNet.cntkmodel"
     __C.CNTK.FEATURE_NODE_NAME = "data"
     __C.CNTK.LAST_CONV_NODE_NAME = "conv5_3"
     __C.CNTK.START_TRAIN_CONV_NODE_NAME = "conv3_1"
@@ -171,7 +177,7 @@ __C.TRAIN.FG_THRESH = 0.5
 # Overlap threshold for a ROI to be considered background (class = 0 if
 # overlap in [LO, HI))
 __C.TRAIN.BG_THRESH_HI = 0.5
-__C.TRAIN.BG_THRESH_LO = 0.1
+__C.TRAIN.BG_THRESH_LO = 0.0
 
 # Use horizontally-flipped images during training?
 __C.TRAIN.USE_FLIPPED = True

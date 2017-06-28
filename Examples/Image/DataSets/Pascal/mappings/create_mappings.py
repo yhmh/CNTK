@@ -9,7 +9,7 @@ from PIL import Image
 use_relative_coords_ctr_wh = False
 # else: top left and bottom right corner are used (i.e. xmin, ymin, xmax, ymax) in absolute coords
 
-use_pad_scale = True
+use_pad_scale = False
 pad_width = 1000
 pad_height = 1000
 
@@ -34,42 +34,43 @@ def format_roi(cls_index, xmin, ymin, xmax, ymax, img_file_path):
     if use_pad_scale or use_relative_coords_ctr_wh:
         img_width, img_height = Image.open(img_file_path).size
 
-    if use_pad_scale:
-        scale_x = (1.0 * pad_width) / img_width
-        scale_y = (1.0 * pad_height) / img_height
+        if use_pad_scale:
+            scale_x = (1.0 * pad_width) / img_width
+            scale_y = (1.0 * pad_height) / img_height
 
-        min_scale = min(scale_x, scale_y)
-        if round(img_width * min_scale) != pad_width and round(img_height * min_scale) != pad_height:
-            import pdb; pdb.set_trace()
+            min_scale = min(scale_x, scale_y)
+            if round(img_width * min_scale) != pad_width and round(img_height * min_scale) != pad_height:
+                import pdb; pdb.set_trace()
 
-        new_width = round(img_width * min_scale)
-        new_height = round(img_height * min_scale)
-        assert(new_width == pad_width or new_height == pad_height)
-        assert(new_width <= pad_width and new_height <= pad_height)
+            new_width = round(img_width * min_scale)
+            new_height = round(img_height * min_scale)
+            assert(new_width == pad_width or new_height == pad_height)
+            assert(new_width <= pad_width and new_height <= pad_height)
 
-        offset_x = (pad_width - new_width) / 2
-        offset_y = (pad_height - new_height) / 2
+            offset_x = (pad_width - new_width) / 2
+            offset_y = (pad_height - new_height) / 2
 
-        width = round(width * min_scale)
-        height = round(height * min_scale)
-        posx = round(posx * min_scale + offset_x)
-        posy = round(posy * min_scale + offset_y)
+            width = round(width * min_scale)
+            height = round(height * min_scale)
+            posx = round(posx * min_scale + offset_x)
+            posy = round(posy * min_scale + offset_y)
 
-        norm_width = pad_width
-        norm_height = pad_height
-    else:
-        norm_width = img_width
-        norm_height = img_height
+            norm_width = pad_width
+            norm_height = pad_height
+        else:
+            norm_width = img_width
+            norm_height = img_height
+
+        if use_relative_coords_ctr_wh:
+            ctrx = xmin + width / 2
+            ctry = ymin + height / 2
+
+            width = float(width) / norm_width
+            height = float(height) / norm_height
+            ctrx = float (ctrx) / norm_width
+            ctry = float(ctry) / norm_height
 
     if use_relative_coords_ctr_wh:
-        ctrx = xmin + width / 2
-        ctry = ymin + height / 2
-
-        width = float(width) / norm_width
-        height = float(height) / norm_height
-        ctrx = float (ctrx) / norm_width
-        ctry = float(ctry) / norm_height
-
         return "{:.4f} {:.4f} {:.4f} {:.4f} {} ".format(ctrx, ctry, width, height, cls_index)
     else:
         posx2 = posx + width

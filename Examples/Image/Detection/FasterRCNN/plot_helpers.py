@@ -44,7 +44,7 @@ def visualizeResultsFaster(imgPath, roiLabels, roiScores, roiRelCoords, padWidth
         h_border = int((imgHeight - imgWidth)/2)
         v_border = 0
 
-    PAD_COLOR = [114, 114, 114]
+    PAD_COLOR = [104, 117, 124] # [114, 114, 114]
     cv_img = cv2.imread(imgPath)
     rgb_img = cv2.cvtColor(cv_img,cv2.COLOR_BGR2RGB)
     resized = cv2.resize(rgb_img, (imgWidth, imgHeight), interpolation=cv2.INTER_NEAREST)
@@ -133,7 +133,7 @@ def load_resize_and_pad(image_path, width, height, pad_value=114):
 def eval_and_plot_faster_rcnn(eval_model, num_images_to_plot, test_map_file, img_shape,
                               results_base_path, feature_node_name, classes,
                               drawUnregressedRois=False, drawNegativeRois=False,
-                              nmsThreshold=0.5, decisionThreshold = 0.8):
+                              nmsThreshold=0.5, nmsConfThreshold=0.0, bgrPlotThreshold = 0.8):
     # get image paths
     with open(test_map_file) as f:
         content = f.readlines()
@@ -169,18 +169,21 @@ def eval_and_plot_faster_rcnn(eval_model, num_images_to_plot, test_map_file, img
         if drawUnregressedRois:
             # plot results without final regression
             imgDebug = visualizeResultsFaster(imgPath, labels, scores, out_rpn_rois, 1000, 1000,
-                                              classes, nmsKeepIndices=None, boDrawNegativeRois=drawNegativeRois, decisionThreshold=decisionThreshold)
+                                              classes, nmsKeepIndices=None, boDrawNegativeRois=drawNegativeRois,
+                                              decisionThreshold=bgrPlotThreshold)
             imsave("{}/{}_{}".format(results_base_path, i, os.path.basename(imgPath)), imgDebug)
 
         # apply regression and nms to bbox coordinates
         regressed_rois = regress_rois(out_rpn_rois, out_bbox_regr, labels)
 
         nmsKeepIndices = apply_nms_to_single_image_results(regressed_rois, labels, scores,
-                                                    nms_threshold=nmsThreshold, conf_threshold=decisionThreshold)
+                                                    nms_threshold=nmsThreshold,
+                                                    conf_threshold=nmsConfThreshold)
 
         img = visualizeResultsFaster(imgPath, labels, scores, regressed_rois, 1000, 1000,
                                      classes, nmsKeepIndices=nmsKeepIndices,
-                                     boDrawNegativeRois=drawNegativeRois, decisionThreshold=decisionThreshold)
+                                     boDrawNegativeRois=drawNegativeRois,
+                                     decisionThreshold=bgrPlotThreshold)
         imsave("{}/{}_regr_{}".format(results_base_path, i, os.path.basename(imgPath)), img)
 
 
