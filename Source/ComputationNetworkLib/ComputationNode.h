@@ -162,9 +162,9 @@ typedef IStatefulNode::NodeStatePtr NodeStatePtr;
 
 enum class ParentGradientOptimization
 {
-    None,
-    Overwrite,
-    Reuse
+    None,       // no parent gradient optimization
+    Overwrite,  // parent overwrite gradient with beta = 0, so child don't need to reset its value
+    Reuse       // parent gradient matrix is reused by child
 };
 
 class ComputationNetwork;
@@ -204,7 +204,7 @@ struct ComputationNetworkOwnedNodeState
         if (ParentGradientReused())
             LogicError("Unexpected gradient reuse.");
 
-        return ParentGradientOptimized();
+        return m_parentGradientOptimization == ParentGradientOptimization::Overwrite;
     }
 
     virtual void MarkValueNonSharable() { m_valueSharable = false; }
@@ -332,7 +332,8 @@ public:
 
     ComputationNodeBase(DEVICEID_TYPE deviceId, const wstring& name) :
         m_deviceId(deviceId), m_outputNeededDuringBackprop(true), m_learningRateMultiplier(0),
-        m_gradientInitialized(false), m_nodeName(name == L"" ? CreateUniqNodeName() : name), m_isValueSparse(false)
+        m_gradientInitialized(false), m_firstGradientParent(nullptr),
+        m_nodeName(name == L"" ? CreateUniqNodeName() : name), m_isValueSparse(false)
     {
         // TODO: should m_learningRateMultiplier be set to 0? Or should every node have a way to add its own say on the learning rate for all its inputs?
         // we store a unique numeric number for every node that is constructed, as a debugging aid
@@ -489,6 +490,14 @@ public:
                 return true;
         }
         return false;
+    }
+
+    bool IsGradientOverwritten(const ComputationNodeBase* parent) const
+    {
+        if (parent == nullptr)
+            LogicError("parent cannot be null");
+
+        return ParentOverwritesGradient() || (m_firstGradientParent == parent);
     }
 
     // interpretation as a Matrix reference
@@ -809,7 +818,10 @@ public:
     void /*ComputationNodeBase::*/ ZeroGradientsOfInputs()
     {
         for (size_t i = 0; i < m_inputs.size(); i++)
+        {
             Input(i)->m_gradientInitialized = false;
+            Input(i)->m_firstGradientParent = nullptr;
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -974,6 +986,7 @@ protected:
     // flags related to gradient propagation
     float m_learningRateMultiplier;    // update parameters? Only used for LearnableParameters.    --TODO: Should we make this a member of LearnableParameters actually? And require a type cast? Currently it is read out for all leaves.
     bool m_gradientInitialized;        // indicates whether the gradient matrix has been resized and initialized to 0
+    const ComputationNodeBase* m_firstGradientParent; // marks the first parent in gradient backprop, so the parent can overwrite to save a memset(0)
     bool m_outputNeededDuringBackprop; // indicates whether the output value of the node is needed during backprop
 };
 typedef ComputationNodeBase::ComputationNodeBasePtr ComputationNodeBasePtr;
@@ -1772,7 +1785,7 @@ public:
 
     // lazy resetting of gradient
     // This performs the actual zeroing out.
-    void LazyZeroGradient()
+    void LazyZeroGradient(const ComputationNodeBase* parent = nullptr)
     {
         if (!m_needsGradient)
             LogicError("%ls %ls operation: LazyZeroGradient() called although this node needs no gradient.", NodeName().c_str(), OperationName().c_str());
@@ -1780,16 +1793,35 @@ public:
         if (m_gradientInitialized)
             return;
 
+        if (m_firstGradientParent != nullptr)
+            LogicError("gradient is not initialized, while first gradient parent is remembered");
+
+        // Optimization when non-null parent is passed in, the child node would only remember the parent to allow it to overwrite
+        // note this first-parent-to-overwrite optimization is different from ParentGradientOptimized() in that it does not require the
+        // child to have a single parent. It has following cases:
+        // 1. parent == nullptr or parent didn't implement gradient optimization, m_firstGradientParent == nullptr:
+        //      the default, don't use first-parent-to-overwrite optimization
+        // 2. parent != nullptr and implemented gradient optimization, m_firstGradientParent = nullptr:
+        //      remember the first parent, and skip reset (first parent would overwrite)
+        // 3. m_firstGradientParent != nullptr:
+        //      first-parent-to-overwrite already remembered, regard as m_gradientInitialized
+
+        bool mayUseFirstParentGradientOptimization =
+            (parent != nullptr) &&
+            (parent->ImplementsGradientOptimization(this) != ParentGradientOptimization::None);
+
         ResetGradient(0);
+
+        m_firstGradientParent = mayUseFirstParentGradientOptimization ? parent : nullptr;
     }
 
     // resize and reset this node's gradient to a given value (normally 0, 1 for root)
-    void ResetGradient(ElemType val)
+    void ResetGradient(ElemType val, bool mayUseFirstParentGradientOptimization = false)
     {
         UpdateDataSize(Gradient());
 
         // No need to zero initialize the gradient if the node's parent is going to overwrite it anyways
-        if ((val != 0) || !ParentGradientOptimized())
+        if ((val != 0) || (!ParentGradientOptimized() && !mayUseFirstParentGradientOptimization))
             Gradient().SetValue(val);
 
         m_gradientInitialized = true;
@@ -1806,6 +1838,7 @@ public:
 
         Gradient().AssignValuesOf(val);
 
+        m_firstGradientParent = nullptr;
         m_gradientInitialized = true;
     }
 

@@ -423,7 +423,7 @@ public:
                 inputGradient = Input(inputIndex)->GradientTensorFor(rank, FrameRange(InputRef(inputIndex).GetMBLayout(), 0));
             }
 
-            if (InputRef(inputIndex).ParentOverwritesGradient())
+            if (InputRef(inputIndex).IsGradientOverwritten(this))
                 inputGradient.AssignCopyOf(gradient);
             else
                 inputGradient.AddCopyOf(gradient);
