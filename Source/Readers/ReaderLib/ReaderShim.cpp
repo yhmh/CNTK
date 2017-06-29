@@ -18,9 +18,7 @@
 #include "DataReader.h"
 #include "ReaderShim.h"
 #include "DataTransferer.h"
-#ifndef CNTK_UWP
 #include "PerformanceProfiler.h"
-#endif
 
 namespace Microsoft { namespace MSR { namespace CNTK {
 
@@ -334,9 +332,7 @@ bool ReaderShim<ElemType>::GetMinibatch(StreamMinibatchInputs& matrices)
 template <class ElemType>
 typename ReaderShim<ElemType>::PrefetchResult ReaderShim<ElemType>::PrefetchMinibatch(size_t currentDataTransferIndex)
 {
-#ifndef CNTK_UWP
     PROFILE_SCOPE(profilerEvtPrefetchMinibatch);
-#endif
 
     // Resetting layouts.
     for (auto& mx : m_prefetchBuffers)
