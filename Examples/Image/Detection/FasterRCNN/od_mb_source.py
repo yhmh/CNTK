@@ -36,7 +36,15 @@ class ObjectDetectionMinibatchSource(UserMinibatchSource):
         return self.dims_si
 
     def next_minibatch(self, num_samples, number_of_workers=1, worker_rank=1, device=None, input_map=None):
-        img_data, roi_data, img_dims = self.od_reader.get_next_input()
+        result, _ =  self.next_minibatch_with_index(num_samples, number_of_workers, worker_rank, device, input_map)
+        return result
+
+    def next_minibatch_with_index(self, num_samples, number_of_workers=1, worker_rank=1, device=None, input_map=None):
+        if num_samples > 1:
+            print("Only single item mini batches are supported currently by od_mb_source.py")
+            exit(1)
+
+        img_data, roi_data, img_dims, index = self.od_reader.get_next_input()
 
         sweep_end = self.od_reader.sweep_end()
 
@@ -56,4 +64,4 @@ class ObjectDetectionMinibatchSource(UserMinibatchSource):
                 input_map[self.dims_si]:  MinibatchData(Value(batch=np.asarray(img_dims, dtype=np.float32)), 1, 1, sweep_end),
             }
 
-        return result
+        return result, index

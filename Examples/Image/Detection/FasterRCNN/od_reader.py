@@ -55,7 +55,7 @@ class ObjectDetectionReader:
         if DEBUG:
             self._debug_plot(resized_with_pad, roi_data)
 
-        return img_data, roi_data, img_dims
+        return img_data, roi_data, img_dims, index
 
     def _debug_plot(self, img_data, roi_data):
         color = (0, 255, 0)
