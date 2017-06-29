@@ -367,7 +367,8 @@ def train_faster_rcnn_e2e(debug_output=False):
         plot(loss, os.path.join(globalvars['output_path'], "graph_frcn_train_e2e." + cfg["CNTK"].GRAPH_TYPE))
 
     # Set learning parameters
-    lr_schedule = learning_rate_schedule(cfg["CNTK"].E2E_LR_PER_SAMPLE, unit=UnitType.sample)
+    lr_per_sample = cfg["CNTK"].E2E_LR_PER_SAMPLE * 1.0 / cfg["TRAIN"].RPN_POST_NMS_TOP_N
+    lr_schedule = learning_rate_schedule(lr_per_sample, unit=UnitType.sample)
     mm_schedule = momentum_schedule(cfg["CNTK"].MOMENTUM_PER_MB)
 
     train_model(image_input, roi_input, dims_input, loss, pred_error,
@@ -382,8 +383,10 @@ def train_faster_rcnn_alternating(debug_output=False):
         # Create initial network, only rpn, without detection network
             # --> train only the rpn (and conv3_1 and up for VGG16)
             # lr = [0.001] * 12 + [0.0001] * 4, momentum = 0.9, weight decay = 0.0005 (cf. stage1_rpn_solver60k80k.pt)
-        
-        # Create full network, initialize conv layers with imagenet, fix rpn weights
+
+        # buffer region proposals from rpn
+
+        # Create full network, initialize conv layers with imagenet, use buffered proposals
             # --> train only detection network (and conv3_1 and up for VGG16)
             # lr = [0.001] * 6 + [0.0001] * 2, momentum = 0.9, weight decay = 0.0005 (cf. stage1_fast_rcnn_solver30k40k.pt)
         
@@ -401,7 +404,7 @@ def train_faster_rcnn_alternating(debug_output=False):
     rpn_lr_per_sample_scaled = [x * rpn_lr_factor for x in cfg["CNTK"].RPN_LR_PER_SAMPLE]
     rpn_lr_schedule = learning_rate_schedule(rpn_lr_per_sample_scaled, unit=UnitType.sample)
 
-    frcn_lr_factor = globalvars['frcn_lr_factor']
+    frcn_lr_factor = globalvars['frcn_lr_factor'] * 1.0 / cfg["TRAIN"].RPN_POST_NMS_TOP_N
     frcn_lr_per_sample_scaled = [x * frcn_lr_factor for x in cfg["CNTK"].FRCN_LR_PER_SAMPLE]
     frcn_lr_schedule = learning_rate_schedule(frcn_lr_per_sample_scaled, unit=UnitType.sample)
 

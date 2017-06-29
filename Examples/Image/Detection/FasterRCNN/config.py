@@ -53,16 +53,16 @@ __C.CNTK.MOMENTUM_PER_MB = 0.9
 # Caffe Faster R-CNN parameters are: base_lr: 0.001, lr_policy: "step", gamma: 0.1, stepsize: 50000, momentum: 0.9, weight_decay: 0.0005
 # ==> CNTK: lr_per_sample = [0.001] * 10 + [0.0001] * 10 + [0.00001]
 __C.CNTK.E2E_MAX_EPOCHS = 20
-__C.CNTK.E2E_LR_PER_SAMPLE = [0.00001] * 10 + [0.000001] * 10 + [0.000001]
+__C.CNTK.E2E_LR_PER_SAMPLE = [0.001] * 10 + [0.0001] * 10 + [0.00001]
 
 # caffe rpn training: lr = [0.001] * 12 + [0.0001] * 4, momentum = 0.9, weight decay = 0.0005 (cf. stage1_rpn_solver60k80k.pt)
-__C.CNTK.RPN_EPOCHS = 16
+__C.CNTK.RPN_EPOCHS = 4 # 16
 __C.CNTK.RPN_LR_PER_SAMPLE = [0.001] * 12 + [0.0001] * 4
 #__C.CNTK.RPN_EPOCHS = 6
 #__C.CNTK.RPN_LR_PER_SAMPLE = [0.002] * 4 + [0.001] * 2
 
 # caffe frcn training: lr = [0.001] * 6 + [0.0001] * 2, momentum = 0.9, weight decay = 0.0005 (cf. stage1_fast_rcnn_solver30k40k.pt)
-__C.CNTK.FRCN_EPOCHS = 8
+__C.CNTK.FRCN_EPOCHS = 10 # 8
 __C.CNTK.FRCN_LR_PER_SAMPLE = [0.001] * 6 + [0.0001] * 2
 #__C.CNTK.FRCN_EPOCHS = 20
 #__C.CNTK.FRCN_LR_PER_SAMPLE = [0.00001] * 8 + [0.000005] * 6 + [0.000001] * 6
@@ -73,12 +73,12 @@ __C.CNTK.IMAGE_HEIGHT = 1000
 
 __C.CNTK.RESULTS_NMS_THRESHOLD = 0.3
 __C.CNTK.RESULTS_NMS_CONF_THRESHOLD = 0.5
-__C.CNTK.RESULTS_BGR_PLOT_THRESHOLD = 0.01
+__C.CNTK.RESULTS_BGR_PLOT_THRESHOLD = 0.1
 
 __C.CNTK.GRAPH_TYPE = "png" # "png" or "pdf"
 __C.CNTK.VISUALIZE_RESULTS = True
 __C.CNTK.DRAW_NEGATIVE_ROIS = False
-__C.CNTK.DRAW_UNREGRESSED_ROIS = False
+__C.CNTK.DRAW_UNREGRESSED_ROIS = True
 
 __C.CNTK.FEATURE_STREAM_NAME = 'features'
 __C.CNTK.ROI_STREAM_NAME = 'roiAndLabel'
