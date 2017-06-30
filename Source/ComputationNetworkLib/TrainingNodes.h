@@ -2254,14 +2254,28 @@ public:
         Matrix<ElemType> sliceInput0Grad = InputRef(0).GradientFor(fr);
         Matrix<ElemType> sliceOutputGrad = GradientFor(fr);
 
-        if (IsEnabled())
-            sliceInput0Grad.AddElementProductOf(sliceOutputGrad, DataFor(*m_maskOfDropout, fr));
+        if (InputRef(0).IsGradientOverwrittenBy(this))
+        {
+            if (IsEnabled())
+                sliceInput0Grad.AssignElementProductOf(sliceOutputGrad, DataFor(*m_maskOfDropout, fr));
+            else
+                sliceInput0Grad.AssignValuesOf(sliceOutputGrad);
+        }
         else
-            sliceInput0Grad += sliceOutputGrad;
+        {
+            if (IsEnabled())
+                sliceInput0Grad.AddElementProductOf(sliceOutputGrad, DataFor(*m_maskOfDropout, fr));
+            else
+                sliceInput0Grad += sliceOutputGrad;
+        }
     }
 
     virtual bool OutputUsedInComputingInputNodesGradients() const override { return false; }
     virtual bool InputUsedInComputingInputNodesGradients(size_t /*childIndex*/) const override { return false; }
+    virtual ParentGradientOptimization ImplementsGradientOptimization(const ComputationNodeBase* /*input*/) const
+    {
+        return ParentGradientOptimization::Overwrite;
+    }
 
     virtual void UpdateFunctionMBSize() override
     {
@@ -2734,12 +2748,20 @@ public:
         if (inputIndex == SCALE) // derivative with respect to the scale, precomputed during input derivative computation
         {
             assert(m_gradientValid);
-            Input(SCALE)->Gradient() += *m_dScale;
+
+            if (Input(SCALE)->IsGradientOverwrittenBy(this))
+                Input(SCALE)->Gradient().AssignValuesOf(*m_dScale);
+            else
+                Input(SCALE)->Gradient() += *m_dScale;
         }
         else if (inputIndex == BIAS) // derivative with respect to the bias, precomputed during input derivative computation
         {
             assert(m_gradientValid);
-            Input(BIAS)->Gradient() += *m_dBias;
+
+            if (Input(BIAS)->IsGradientOverwrittenBy(this))
+                Input(BIAS)->Gradient().AssignValuesOf(*m_dBias);
+            else
+                Input(BIAS)->Gradient() += *m_dBias;
         }
         // No derivatives with respect to running mean and variance.
     }

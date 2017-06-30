@@ -72,7 +72,7 @@ public:
         }
         else if (opTypeHolder == unaryGradient)
         {
-            sliceInputGrad.DoUnaryOpOf(Input(inputIndex)->IsGradientOverwritten(this) ? 0.0f : 1.0f, sliceOutputGrad, 1, opBackward, opSum);
+            sliceInputGrad.DoUnaryOpOf(Input(inputIndex)->IsGradientOverwrittenBy(this) ? 0.0f : 1.0f, sliceOutputGrad, 1, opBackward, opSum);
         }
         else 
         {
@@ -80,7 +80,7 @@ public:
             // Not possible for Cos().
             auto sliceValue = (opType == binaryWithOutputGradient) ? ValueTensorFor(rank, fr) : // using input or output value
                 InputRef(0).ValueTensorFor(rank, fr);
-            sliceInputGrad.DoBinaryOpOf(Input(inputIndex)->IsGradientOverwritten(this) ? 0.0f : 1.0f, sliceOutputGrad, sliceValue, 1, opBackward, opSum);
+            sliceInputGrad.DoBinaryOpOf(Input(inputIndex)->IsGradientOverwrittenBy(this) ? 0.0f : 1.0f, sliceOutputGrad, sliceValue, 1, opBackward, opSum);
         }
     }
 

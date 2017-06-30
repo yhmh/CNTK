@@ -73,7 +73,7 @@ public:
         auto gradient = ComputationNode<ElemType>::Unpack(GetSampleLayout(), Gradient(), m_pMBLayout, m_tempUnpackedData, m_tempScatterIndices, std::shared_ptr<Matrix<char>>(nullptr), /*batchMajor=*/ false, &gapPadValue);
         auto inputGradient = InputRef(inputIndex).GradientTensorFor(InputRef(inputIndex).GetSampleLayout().GetRank(), FrameRange(InputRef(inputIndex).GetMBLayout()));
 
-        if (InputRef(inputIndex).IsGradientOverwritten(this))
+        if (InputRef(inputIndex).IsGradientOverwrittenBy(this))
             inputGradient.AssignCopyOf(gradient);
         else
             inputGradient.AddCopyOf(gradient);
@@ -81,6 +81,10 @@ public:
 
     virtual bool OutputUsedInComputingInputNodesGradients() const override { return false; }
     virtual bool InputUsedInComputingInputNodesGradients(size_t childIndex) const override { return false; }
+    virtual ParentGradientOptimization ImplementsGradientOptimization(const ComputationNodeBase*) const override
+    {
+        return ParentGradientOptimization::Overwrite;
+    }
 
     virtual void Validate(bool isFinalValidationPass) override
     {
@@ -356,7 +360,7 @@ public:
         }
     }
 
-    virtual void /*ComputationNodeNonLooping::*/ BackpropToNonLooping(size_t inputIndex) override
+    virtual void /*ComputationNodeNonLooping::*/ BackpropToNonLooping(size_t /*inputIndex*/) override
     {
 
         auto numSequences = GetMBLayout()->GetNumSequences();
@@ -393,11 +397,18 @@ public:
         if (*packedGradientMatrixAndLayout.second != *inMBLayout)
             LogicError("%ls: %s node unpacked gradient MBLayout does not match input MBLayout.", Base::NodeDescription().c_str(), typeid(*this).name());
 
-        InputRef(0).Gradient() += (*packedGradientMatrixAndLayout.first);
+        if (InputRef(0).IsGradientOverwrittenBy(this))
+            InputRef(0).Gradient().SetValue(*packedGradientMatrixAndLayout.first);
+        else
+            InputRef(0).Gradient() += (*packedGradientMatrixAndLayout.first);
     }
 
     virtual bool OutputUsedInComputingInputNodesGradients() const override { return false; }
     virtual bool InputUsedInComputingInputNodesGradients(size_t childIndex) const override { return false; }
+    virtual ParentGradientOptimization ImplementsGradientOptimization(const ComputationNodeBase*) const override
+    {
+        return ParentGradientOptimization::Overwrite;
+    }
 
     bool ForceDynamicValidation() const override { return true; }
 

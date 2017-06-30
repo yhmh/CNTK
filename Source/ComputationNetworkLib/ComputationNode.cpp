@@ -41,7 +41,7 @@ void ComputationNode<ElemType>::Backprop(const FrameRange& fr, bool childrenInTh
     }
 #endif
     if (m_needsGradient)
-        LazyZeroGradient(); // set gradient to 0 if this is the first time
+        LazyZeroGradient(this); // set gradient to 0 if this is the first time
 #endif
 
     if (fr.IsAllFrames() && IsPartOfLoop() && childrenInThisLoop)
@@ -70,6 +70,9 @@ void ComputationNode<ElemType>::Backprop(const FrameRange& fr, bool childrenInTh
                 LogicError("Backprop: Inefficiency: %ls %ls operation in loop propagates gradient to non-loop %ls %ls\n",
                            NodeName().c_str(), OperationName().c_str(), child->NodeName().c_str(), child->OperationName().c_str());
             }
+
+            // before backprop, verify gradient optimization info
+            Input(i)->VerifyGradientOptimization(this);
 
             // fprintf(stderr, "BackpropTo %d %d %ls %ls\n", (int)fr.timeIdxInSeq, (int)i, NodeName().c_str(), OperationName().c_str());
             BackpropTo(i, fr); // this computes partial wrt to the child and sums the gradient value in the child

@@ -280,6 +280,11 @@ public:
     virtual bool /*ComputationNodeBase::*/ InputUsedInComputingInputNodesGradients(size_t childIndex) const override;
     virtual void /*ComputationNodeBase::*/ Validate(bool isFinalValidationPass) override;
 
+    virtual ParentGradientOptimization ImplementsGradientOptimization(const ComputationNodeBase*) const override
+    {
+        return ParentGradientOptimization::Overwrite;
+    }
+
     void RequestMatricesBeforeForwardProp(MatrixPool& matrixPool) override
     {
         Base::RequestMatricesBeforeForwardProp(matrixPool);
@@ -423,7 +428,7 @@ public:
                 inputGradient = Input(inputIndex)->GradientTensorFor(rank, FrameRange(InputRef(inputIndex).GetMBLayout(), 0));
             }
 
-            if (InputRef(inputIndex).IsGradientOverwritten(this))
+            if (InputRef(inputIndex).IsGradientOverwrittenBy(this))
                 inputGradient.AssignCopyOf(gradient);
             else
                 inputGradient.AddCopyOf(gradient);
@@ -434,6 +439,10 @@ public:
 
     virtual bool OutputUsedInComputingInputNodesGradients() const override { return false; }
     virtual bool InputUsedInComputingInputNodesGradients(size_t /*childIndex*/) const override { return false; }
+    virtual ParentGradientOptimization ImplementsGradientOptimization(const ComputationNodeBase*) const override
+    {
+        return ParentGradientOptimization::Overwrite;
+    }
 
     virtual void /*ComputationNodeBase::*/ Validate(bool isFinalValidationPass) override
     {
@@ -609,11 +618,18 @@ public:
         size_t rank = DetermineElementwiseTensorRank();
         let outputGrad = GradientTensorFor(rank, fr);
         auto inputGrad = TensorView<ElemType>(InputRef(0).GradientPtr(), GetInputSlice(rank, fr.AllowBroadcast()));
-        inputGrad.AddCopyOf(outputGrad);
+        if (InputRef(0).IsGradientOverwrittenBy(this))
+            inputGrad.AssignCopyOf(outputGrad);
+        else
+            inputGrad.AddCopyOf(outputGrad);
     }
 
     virtual bool OutputUsedInComputingInputNodesGradients() const override { return false; }
     virtual bool InputUsedInComputingInputNodesGradients(size_t /*childIndex*/) const override { return false; }
+    virtual ParentGradientOptimization ImplementsGradientOptimization(const ComputationNodeBase*) const override
+    {
+        return ParentGradientOptimization::Overwrite;
+    }
 
     virtual void /*ComputationNodeBase::*/ Validate(bool isFinalValidationPass) override
     {
@@ -834,11 +850,18 @@ public:
         auto inputGrad = InputRef(inputIndex).GradientTensorFor(rank, fr.AllowBroadcast());
         let outputSubSlice = NarrowToStripe(outputSlice, inputIndex);
         let outputGrad = TensorView<ElemType>(GradientPtr(), outputSubSlice);
-        inputGrad.AddCopyOf(outputGrad);
+        if (InputRef(inputIndex).IsGradientOverwrittenBy(this))
+            inputGrad.AssignCopyOf(outputGrad);
+        else
+            inputGrad.AddCopyOf(outputGrad);
     }
 
     virtual bool OutputUsedInComputingInputNodesGradients() const override { return false; }
     virtual bool InputUsedInComputingInputNodesGradients(size_t /*childIndex*/) const override { return false; }
+    virtual ParentGradientOptimization ImplementsGradientOptimization(const ComputationNodeBase* input) const override
+    {
+        return ParentGradientOptimization::Overwrite;
+    }
 
     virtual void /*ComputationNodeBase::*/ Validate(bool isFinalValidationPass) override
     {
@@ -1124,6 +1147,11 @@ public:
     virtual void /*ComputationNodeNonLooping::*/ BackpropToNonLooping(size_t inputIndex) override;
     virtual bool OutputUsedInComputingInputNodesGradients() const override { return false; }
     virtual bool InputUsedInComputingInputNodesGradients(size_t childIndex) const override { return childIndex == INDEXDATA; }
+    virtual ParentGradientOptimization ImplementsGradientOptimization(const ComputationNodeBase*) const override
+    {
+        return ParentGradientOptimization::Overwrite;
+    }
+
     virtual void Validate(bool isFinalValidationPass) override;
 };
 
