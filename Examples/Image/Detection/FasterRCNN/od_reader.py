@@ -24,11 +24,14 @@ if DEBUG:
 
 class ObjectDetectionReader:
     def __init__(self, img_map_file, roi_map_file, max_annotations_per_image,
-                 pad_width, pad_height, pad_value, randomize=True, max_images=None):
+                 pad_width, pad_height, pad_value, randomize, random_flip,
+                 max_images=None, buffered_rpn_proposals=None):
         self._pad_width = pad_width
         self._pad_height = pad_height
         self._pad_value = pad_value
         self._randomize = randomize
+        self._random_flip = random_flip
+        self._buffered_rpn_proposals = buffered_rpn_proposals
         self._img_file_paths = []
         self._gt_annotations = []
 
@@ -48,14 +51,21 @@ class ObjectDetectionReader:
         '''
 
         index = self._get_next_image_index()
-        #img_data, img_dims, resized_with_pad = self._load_resize_and_pad_image(index)
-        img_data, img_dims = self._load_resize_and_pad_image(index)
-        roi_data = self._gt_annotations[index]
+        flip_image = np.random.rand() > .5 if self._random_flip else False
+        print("flip: {}".format(flip_image))
 
+        roi_data = self._get_gt_annotations(index, flip_image)
         if DEBUG:
+            img_data, img_dims, resized_with_pad = self._load_resize_and_pad_image(index, flip_image)
             self._debug_plot(resized_with_pad, roi_data)
+        else:
+            img_data, img_dims = self._load_resize_and_pad_image(index, flip_image)
+        buffered_proposals = self._get_buffered_proposals(index, flip_image)
 
-        return img_data, roi_data, img_dims, index
+        return img_data, roi_data, img_dims, buffered_proposals
+
+    def sweep_end(self):
+        return self._reading_index >= self._num_images
 
     def _debug_plot(self, img_data, roi_data):
         color = (0, 255, 0)
@@ -72,9 +82,6 @@ class ObjectDetectionReader:
         mp.imshow(img_data)
         mp.plot()
         mp.show()
-
-    def sweep_end(self):
-        return self._reading_index >= self._num_images
 
     def _parse_map_files(self, img_map_file, roi_map_file, max_annotations_per_image, max_images):
         # read image map file and buffer sequence numbers
@@ -120,13 +127,6 @@ class ObjectDetectionReader:
 
         return len(img_sequence_numbers)
 
-    def _get_next_image_index(self):
-        if self._reading_index < 0 or self._reading_index >= self._num_images:
-            self._reset_reading_order()
-        next_image_index = self._reading_order[self._reading_index]
-        self._reading_index += 1
-        return next_image_index
-
     def _reset_reading_order(self):
         self._reading_order = np.arange(self._num_images)
         if self._randomize:
@@ -134,7 +134,7 @@ class ObjectDetectionReader:
 
         self._reading_index = 0
 
-    def read_image(self, image_path):
+    def _read_image(self, image_path):
         if "@" in image_path:
             at = str.find(image_path, '@')
             zip_file = image_path[:at]
@@ -181,10 +181,17 @@ class ObjectDetectionReader:
         img_stats = [target_w, target_h, img_width, img_height, top, bottom, left, right]
         self._img_stats[index] = img_stats
 
-    def _load_resize_and_pad_image(self, index):
+    def _get_next_image_index(self):
+        if self._reading_index < 0 or self._reading_index >= self._num_images:
+            self._reset_reading_order()
+        next_image_index = self._reading_order[self._reading_index]
+        self._reading_index += 1
+        return next_image_index
+
+    def _load_resize_and_pad_image(self, index, flip_image):
         image_path = self._img_file_paths[index]
 
-        img = self.read_image(image_path)
+        img = self._read_image(image_path)
         if self._img_stats[index] is None:
             img_width = len(img[0])
             img_height = len(img)
@@ -195,10 +202,36 @@ class ObjectDetectionReader:
         resized = cv2.resize(img, (target_w, target_h), 0, 0, interpolation=cv2.INTER_NEAREST)
         resized_with_pad = cv2.copyMakeBorder(resized, top, bottom, left, right, cv2.BORDER_CONSTANT,
                                               value=self._pad_value)
+        if flip_image:
+            resized_with_pad = cv2.flip(resized_with_pad, 1)
 
         # transpose(2,0,1) converts the image to the HWC format which CNTK accepts
         model_arg_rep = np.ascontiguousarray(np.array(resized_with_pad, dtype=np.float32).transpose(2, 0, 1))
 
         # dims = pad_width, pad_height, scaled_image_width, scaled_image_height, orig_img_width, orig_img_height
         dims = (self._pad_width, self._pad_height, target_w, target_h, img_width, img_height)
-        return model_arg_rep, dims #, resized_with_pad
+        if DEBUG:
+            return model_arg_rep, dims, resized_with_pad
+        return model_arg_rep, dims
+
+    def _get_gt_annotations(self, index, flip_image):
+        annotations = self._gt_annotations[index]
+        if flip_image:
+            flipped_annotations = np.array(annotations)
+            flipped_annotations[:,0] = self._pad_width - annotations[:,2]
+            flipped_annotations[:,2] = self._pad_width - annotations[:,0]
+            return flipped_annotations
+        return annotations
+
+    def _get_buffered_proposals(self, index, flip_image):
+        if self._buffered_rpn_proposals is None:
+            return None
+
+        buffered_proposals = self._buffered_rpn_proposals[index]
+        if flip_image:
+            flipped_proposals = np.array(buffered_proposals, dtype=np.float32)
+            flipped_proposals[:,0] = self._pad_width - buffered_proposals[:,2]
+            flipped_proposals[:,2] = self._pad_width - buffered_proposals[:,0]
+            return flipped_proposals
+        return buffered_proposals
+

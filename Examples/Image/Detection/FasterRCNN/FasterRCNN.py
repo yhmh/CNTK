@@ -10,12 +10,11 @@ import numpy as np
 import os, sys
 import argparse
 import cntk
-from cntk import Trainer, UnitType, load_model, user_function, Axis, input_variable, parameter, times, combine, relu, \
-    softmax, roipooling, reduce_sum, slice, splice, reshape, plus, CloneMethod, minus, element_times, alias, Communicator
+from cntk import Trainer, UnitType, load_model, user_function, Axis, input_variable, parameter, times, combine, \
+    softmax, roipooling, reduce_sum, plus, CloneMethod,alias, Communicator
 from cntk.core import Value
-from cntk.io import MinibatchSource, ImageDeserializer, CTFDeserializer, StreamDefs, StreamDef, TraceLevel, MinibatchData
-from cntk.io.transforms import scale
-from cntk.initializer import glorot_uniform, normal
+from cntk.io import MinibatchData
+from cntk.initializer import normal
 from cntk.layers import placeholder, Constant, Sequential
 from cntk.learners import momentum_sgd, learning_rate_schedule, momentum_schedule
 from cntk.logging import log_number_of_parameters, ProgressPrinter
@@ -179,20 +178,6 @@ def parse_arguments():
 ###############################################################
 ###############################################################
 
-# Instantiates a composite minibatch source for reading images, roi coordinates and roi labels for training Faster R-CNN
-def create_mb_source(img_map_file, roi_map_file, img_height, img_width, img_channels, n_rois, randomize=True):
-    if not os.path.exists(img_map_file) or not os.path.exists(roi_map_file):
-        raise RuntimeError("File '%s' or '%s' does not exist. Please run install_fastrcnn.py from "
-                           "Examples/Image/Detection/FastRCNN to fetch them" % (img_map_file, roi_map_file))
-
-    # read images, rois and labels
-    transforms = [scale(width=img_width, height=img_height, channels=img_channels, scale_mode="pad", pad_value=114, interpolations='linear')]
-    image_source = ImageDeserializer(img_map_file, StreamDefs(features = StreamDef(field='image', transforms=transforms)))
-    rois_dim = 5 * n_rois
-    roi_source = CTFDeserializer(roi_map_file, StreamDefs(roiAndLabel = StreamDef(field=cfg["CNTK"].ROI_STREAM_NAME, shape=rois_dim, is_sparse=False)))
-
-    return MinibatchSource([image_source, roi_source], randomize=randomize, trace_level=TraceLevel.Error)
-
 def clone_model(base_model, from_node_names, to_node_names, clone_method):
     from_nodes = [find_by_name(base_model, node_name) for node_name in from_node_names]
     if None in from_nodes:
@@ -267,46 +252,15 @@ def train_model(image_input, roi_input, dims_input, loss, pred_error,
     # Get minibatches of images and perform model training
     print("Training model for %s epochs." % epochs_to_train)
     log_number_of_parameters(loss)
-    if cfg["CNTK"].USE_PYTHON_READER:
-        train_model_using_python_reader(image_input, roi_input, dims_input, trainer, epochs_to_train,
-                                        rpn_rois_input, buffered_rpn_proposals)
-    else:
-        train_model_using_cntk_reader(image_input, roi_input, dims_input, trainer, epochs_to_train)
 
-def train_model_using_cntk_reader(image_input, roi_input, dims_input, trainer, epochs_to_train):
-    # Create the minibatch source
-    minibatch_source = create_mb_source(globalvars['train_map_file'], globalvars['train_roi_file'],
-        image_height, image_width, num_channels, cfg["CNTK"].INPUT_ROIS_PER_IMAGE)
-
-    # define mapping from reader streams to network inputs
-    input_map = {
-        image_input: minibatch_source[cfg["CNTK"].FEATURE_STREAM_NAME],
-        roi_input: minibatch_source[cfg["CNTK"].ROI_STREAM_NAME],
-    }
-
-    progress_printer = ProgressPrinter(tag='Training', num_epochs=epochs_to_train, gen_heartbeat=True)
-    for epoch in range(epochs_to_train):       # loop over epochs
-        sample_count = 0
-        while sample_count < epoch_size:  # loop over minibatches in the epoch
-            data = minibatch_source.next_minibatch(min(mb_size, epoch_size-sample_count), input_map=input_map)
-            data[dims_input] = dims_input_const
-
-            trainer.train_minibatch(data)                                    # update model with it
-            sample_count += trainer.previous_minibatch_sample_count          # count samples processed so far
-            progress_printer.update_with_trainer(trainer, with_metric=True)  # log progress
-            if sample_count % 100 == 0:
-                print("Processed {} samples".format(sample_count))
-
-        progress_printer.epoch_summary(with_metric=True)
-
-def train_model_using_python_reader(image_input, roi_input, dims_input, trainer, epochs_to_train,
-                rpn_rois_input=None, buffered_rpn_proposals=None):
     # Create the minibatch source
     od_minibatch_source = ObjectDetectionMinibatchSource(
         globalvars['train_map_file'], globalvars['train_roi_file'],
         max_annotations_per_image=cfg["CNTK"].INPUT_ROIS_PER_IMAGE,
         pad_width=image_width, pad_height=image_height, pad_value=img_pad_value,
-        max_images=cfg["CNTK"].NUM_TRAIN_IMAGES)
+        randomize=True, random_flip=cfg["TRAIN"].USE_FLIPPED,
+        max_images=cfg["CNTK"].NUM_TRAIN_IMAGES,
+        buffered_rpn_proposals=buffered_rpn_proposals)
 
     # define mapping from reader streams to network inputs
     input_map = {
@@ -320,9 +274,8 @@ def train_model_using_python_reader(image_input, roi_input, dims_input, trainer,
     for epoch in range(epochs_to_train):       # loop over epochs
         sample_count = 0
         while sample_count < epoch_size:  # loop over minibatches in the epoch
-            data, index = od_minibatch_source.next_minibatch_with_index(min(mb_size, epoch_size-sample_count), input_map=input_map)
+            data, proposals = od_minibatch_source.next_minibatch_with_proposals(min(mb_size, epoch_size-sample_count), input_map=input_map)
             if use_buffered_proposals:
-                proposals = buffered_rpn_proposals[index]
                 data[rpn_rois_input] = MinibatchData(Value(batch=np.asarray(proposals, dtype=np.float32)), 1, 1, False)
                 # remove dims input if no rpn is required to avoid warnings
                 del data[[k for k in data if '[6]' in str(k)][0]]
@@ -343,7 +296,7 @@ def compute_rpn_proposals(rpn_model, image_input, roi_input, dims_input):
         max_annotations_per_image=cfg["CNTK"].INPUT_ROIS_PER_IMAGE,
         pad_width=image_width, pad_height=image_height, pad_value=img_pad_value,
         max_images=num_images,
-        randomize=False)
+        randomize=False, random_flip=False)
 
     # define mapping from reader streams to network inputs
     input_map = {
@@ -355,11 +308,11 @@ def compute_rpn_proposals(rpn_model, image_input, roi_input, dims_input):
     buffered_proposals = [None for _ in range(num_images)]
     sample_count = 0
     while sample_count < num_images:
-        data, index = od_minibatch_source.next_minibatch_with_index(1, input_map=input_map)
+        data = od_minibatch_source.next_minibatch(1, input_map=input_map)
         output = rpn_model.eval(data)
         out_dict = dict([(k.name, k) for k in output])
         out_rpn_rois = output[out_dict['rpn_rois']][0]
-        buffered_proposals[index] = np.round(out_rpn_rois).astype(np.int16)
+        buffered_proposals[sample_count] = np.round(out_rpn_rois).astype(np.int16)
         sample_count += 1
         if sample_count % 500 == 0:
             print("Buffered proposals for {} samples".format(sample_count))
@@ -611,28 +564,19 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
     frcn_eval = eval_model(image_input, dims_input)
 
     # Create the minibatch source
-    if cfg['CNTK'].USE_PYTHON_READER:
-        minibatch_source = ObjectDetectionMinibatchSource(
-            img_map_file, roi_map_file,
-            max_annotations_per_image=cfg["CNTK"].INPUT_ROIS_PER_IMAGE,
-            pad_width=image_width, pad_height=image_height, pad_value=img_pad_value, randomize=False,
-            max_images=cfg["CNTK"].NUM_TEST_IMAGES)
+    minibatch_source = ObjectDetectionMinibatchSource(
+        img_map_file, roi_map_file,
+        max_annotations_per_image=cfg["CNTK"].INPUT_ROIS_PER_IMAGE,
+        pad_width=image_width, pad_height=image_height, pad_value=img_pad_value,
+        randomize=False, random_flip=False,
+        max_images=cfg["CNTK"].NUM_TEST_IMAGES)
 
-        # define mapping from reader streams to network inputs
-        input_map = {
-            minibatch_source.image_si: image_input,
-            minibatch_source.roi_si: roi_input,
-            minibatch_source.dims_si: dims_input
-        }
-    else:
-        minibatch_source = create_mb_source(img_map_file, roi_map_file,
-            image_height, image_width, num_channels, cfg["CNTK"].INPUT_ROIS_PER_IMAGE, randomize=False)
-
-        # define mapping from reader streams to network inputs
-        input_map = {
-            image_input: minibatch_source[cfg["CNTK"].FEATURE_STREAM_NAME],
-            roi_input: minibatch_source[cfg["CNTK"].ROI_STREAM_NAME],
-        }
+    # define mapping from reader streams to network inputs
+    input_map = {
+        minibatch_source.image_si: image_input,
+        minibatch_source.roi_si: roi_input,
+        minibatch_source.dims_si: dims_input
+    }
 
     img_key = cfg["CNTK"].FEATURE_NODE_NAME
     roi_key = "x 5]"
@@ -648,22 +592,11 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
     all_gt_infos = {key: [] for key in classes}
     for img_i in range(0, num_test_images):
         mb_data = minibatch_source.next_minibatch(1, input_map=input_map)
-        if not cfg['CNTK'].USE_PYTHON_READER:
-            mb_data[dims_input] = dims_input_const
 
         rkeys = [k for k in mb_data if roi_key in str(k)]
         gt_row = mb_data[rkeys[0]].asarray()
         gt_row = gt_row.reshape((cfg["CNTK"].INPUT_ROIS_PER_IMAGE, 5))
         all_gt_boxes = gt_row[np.where(gt_row[:,-1] > 0)]
-
-        if not cfg['CNTK'].USE_PYTHON_READER:
-            # transform from (x, y, w, h) relative to (x_min, y_min, x_max, y_max) absolute
-            gt_coords = all_gt_boxes[:, :4]
-            gt_labels = all_gt_boxes[:, 4:]
-            gt_coords = gt_coords * 1000.0
-            wh = gt_coords[:,2:4]
-            gt_coords[:,2:4] = gt_coords[:,0:2] + wh
-            all_gt_boxes = np.hstack((gt_coords, gt_labels))
 
         for cls_index, cls_name in enumerate(classes):
             if cls_index == 0: continue

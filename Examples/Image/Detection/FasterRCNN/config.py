@@ -38,7 +38,6 @@ __C.CNTK.MAKE_MODE = False
 __C.CNTK.TRAIN_E2E = False
 __C.CNTK.DEBUG_OUTPUT = True
 __C.CNTK.USE_MEAN_GRADIENT = False
-__C.CNTK.USE_PYTHON_READER = True
 __C.CNTK.TRAIN_CONV_LAYERS = False
 
 __C.CNTK.DATASET = "Grocery" # "Grocery" or "Pascal" ("Overfit")
