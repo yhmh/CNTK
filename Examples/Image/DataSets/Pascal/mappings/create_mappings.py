@@ -77,17 +77,15 @@ def format_roi(cls_index, xmin, ymin, xmax, ymax, img_file_path):
         posy2 = posy + height
         return "{} {} {} {} {} ".format(int(posx), int(posy), int(posx2), int(posy2), cls_index)
 
-def create_mappings(train):
-    if train:
-        img_map_input = "../VOCdevkit/VOC2007/ImageSets/Main/trainval.txt"
-        img_map_output = "trainval2007.txt"
-        roi_map_output = "trainval2007_rois_{}_{}.txt".format(
-            "rel-ctr-wh" if use_relative_coords_ctr_wh else "abs-xyxy", "pad" if use_pad_scale else "noPad")
-    else:
-        img_map_input = "../VOCdevkit/VOC2007/ImageSets/Main/test.txt"
-        img_map_output = "test2007.txt"
-        roi_map_output = "test2007_rois_{}_{}.txt".format("rel-ctr-wh" if use_relative_coords_ctr_wh else "abs-xyxy",
-                                                          "pad" if use_pad_scale else "noPad")
+def create_mappings(train, skip_difficult):
+    file_prefix = "trainval" if train else "test"
+    img_map_input = "../VOCdevkit/VOC2007/ImageSets/Main/{}.txt".format(file_prefix)
+    img_map_output = "{}2007.txt".format(file_prefix)
+    roi_map_output = "{}2007_rois_{}_{}{}.txt".format(
+        file_prefix,
+        "rel-ctr-wh" if use_relative_coords_ctr_wh else "abs-xyxy",
+        "pad" if use_pad_scale else "noPad",
+        "_skipDif" if skip_difficult else "")
 
     in_map_file_path = os.path.join(abs_path, img_map_input)
     out_map_file_path = os.path.join(abs_path, img_map_output)
@@ -110,6 +108,11 @@ def create_mappings(train):
 
                 roi_line = "{} |roiAndLabel ".format(counter)
                 for obj in annotations.findall('object'):
+                    if skip_difficult:
+                        difficult = int(obj.findall('difficult')[0].text)
+                        if difficult == 1:
+                            continue
+
                     cls = obj.findall('name')[0].text
                     cls_index = class_dict[cls]
 
@@ -131,5 +134,5 @@ def create_mappings(train):
             cls_file.write("{}\t{}\n".format(cls, class_dict[cls]))
 
 if __name__ == '__main__':
-    create_mappings(True)
-    create_mappings(False)
+    create_mappings(True, skip_difficult=True)
+    create_mappings(False, skip_difficult=True)

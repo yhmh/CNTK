@@ -52,7 +52,6 @@ class ObjectDetectionReader:
 
         index = self._get_next_image_index()
         flip_image = np.random.rand() > .5 if self._random_flip else False
-        print("flip: {}".format(flip_image))
 
         roi_data = self._get_gt_annotations(index, flip_image)
         if DEBUG:

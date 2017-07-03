@@ -174,6 +174,7 @@ def parse_arguments():
     print("FRCN lr factor   : {}".format(globalvars['frcn_lr_factor']))
     print("FRCN epochs      : {}".format(globalvars['frcn_epochs']))
     print("Momentum per MB  : {}".format(globalvars['momentum_per_mb']))
+    print("Flip image       : {}".format(cfg["TRAIN"].USE_FLIPPED))
 
 ###############################################################
 ###############################################################

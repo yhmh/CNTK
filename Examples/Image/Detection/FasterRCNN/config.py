@@ -40,7 +40,7 @@ __C.CNTK.DEBUG_OUTPUT = True
 __C.CNTK.USE_MEAN_GRADIENT = False
 __C.CNTK.TRAIN_CONV_LAYERS = False
 
-__C.CNTK.DATASET = "Grocery" # "Grocery" or "Pascal" ("Overfit")
+__C.CNTK.DATASET = "Grocery" # "Grocery" or "Pascal"
 __C.CNTK.BASE_MODEL = "AlexNet" # "VGG16" or "AlexNet"
 __C.CNTK.CONV_BIAS_INIT = 0.0
 
@@ -109,24 +109,11 @@ if __C.CNTK.DATASET == "Pascal":
                         'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor')
     __C.CNTK.MAP_FILE_PATH = "../../DataSets/Pascal/mappings"
     __C.CNTK.TRAIN_MAP_FILE = "trainval2007.txt"
-    __C.CNTK.TRAIN_ROI_FILE = "trainval2007_rois_abs-xyxy_noPad.txt"
+    __C.CNTK.TRAIN_ROI_FILE = "trainval2007_rois_abs-xyxy_noPad_skipDif.txt"
     __C.CNTK.TEST_MAP_FILE = "test2007.txt"
-    __C.CNTK.TEST_ROI_FILE = "test2007_rois_abs-xyxy_noPad.txt"
+    __C.CNTK.TEST_ROI_FILE = "test2007_rois_abs-xyxy_noPad_skipDif.txt"
     __C.CNTK.NUM_TRAIN_IMAGES = 5010
     __C.CNTK.NUM_TEST_IMAGES = 4952
-    __C.CNTK.PROPOSAL_LAYER_PARAMS = "'feat_stride': 16\n'scales':\n - 8 \n - 16 \n - 32"
-
-if __C.CNTK.DATASET == "Overfit":
-    __C.CNTK.CLASSES = ('__background__',  # always index 0
-                        'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus', 'car', 'cat', 'chair', 'cow', 'diningtable',
-                        'dog', 'horse', 'motorbike', 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor')
-    __C.CNTK.MAP_FILE_PATH = "../../DataSets/Pascal/mappings"
-    __C.CNTK.TRAIN_MAP_FILE = "overfit.txt"
-    __C.CNTK.TRAIN_ROI_FILE = "overfit_rois_abs-xyxy_noPad.txt"
-    __C.CNTK.TEST_MAP_FILE = "overfit.txt"
-    __C.CNTK.TEST_ROI_FILE = "overfit_rois_abs-xyxy_noPad.txt"
-    __C.CNTK.NUM_TRAIN_IMAGES = 2
-    __C.CNTK.NUM_TEST_IMAGES = 2
     __C.CNTK.PROPOSAL_LAYER_PARAMS = "'feat_stride': 16\n'scales':\n - 8 \n - 16 \n - 32"
 
 #
