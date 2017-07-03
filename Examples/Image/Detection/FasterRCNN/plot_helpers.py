@@ -168,7 +168,7 @@ def eval_and_plot_faster_rcnn(eval_model, num_images_to_plot, test_map_file, img
 
         if drawUnregressedRois:
             # plot results without final regression
-            imgDebug = visualizeResultsFaster(imgPath, labels, scores, out_rpn_rois, 1000, 1000,
+            imgDebug = visualizeResultsFaster(imgPath, labels, scores, out_rpn_rois, img_shape[2], img_shape[1],
                                               classes, nmsKeepIndices=None, boDrawNegativeRois=drawNegativeRois,
                                               decisionThreshold=bgrPlotThreshold)
             imsave("{}/{}_{}".format(results_base_path, i, os.path.basename(imgPath)), imgDebug)
@@ -180,7 +180,7 @@ def eval_and_plot_faster_rcnn(eval_model, num_images_to_plot, test_map_file, img
                                                     nms_threshold=nmsThreshold,
                                                     conf_threshold=nmsConfThreshold)
 
-        img = visualizeResultsFaster(imgPath, labels, scores, regressed_rois, 1000, 1000,
+        img = visualizeResultsFaster(imgPath, labels, scores, regressed_rois, img_shape[2], img_shape[1],
                                      classes, nmsKeepIndices=nmsKeepIndices,
                                      boDrawNegativeRois=drawNegativeRois,
                                      decisionThreshold=bgrPlotThreshold)
