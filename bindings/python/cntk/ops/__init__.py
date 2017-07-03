@@ -1833,7 +1833,43 @@ def transpose(x, perm, name=''):
     if type(perm) in [int, Axis]:
         raise TypeError('transpose expects a permutation; to swap two axes use swapaxes')
     perm = [Axis(p) for p in sanitize_permutation(perm)]
-    return transpose(x, perm, name)
+
+    def _count_nr_of_unflattened_axes_(perm):
+        perm_len=len(perm)
+        if perm_len == 0: return 0
+        count = 1
+        last_val=perm[0]
+        for i in range(1,perm_len):
+            val=perm[i]
+            if last_val != val-1:
+                count+=1
+            last_val=val
+        return count
+
+    # default transpose op if possible
+    if _count_nr_of_unflattened_axes_(np_perm) <= 5:
+        return transpose(x, perm, name)
+
+    # BEGIN of the alternative routine to perform a transpose with more than 5 unflattened axes
+    # the resulting functions may be accumulated in an as_block to apply "name" correctly and hide the output from the user!
+    # in the beginning the axes are sorted
+    current_permutation = np.arange(nr_of_axes)
+    tensor = alias(tensor, "Begin_transpose_" + str(permutation)+ (("_"+name)if name is not None else ""))
+
+    for i in range(nr_of_axes - 1):  # n-1 is sufficient since if 0..n-1 are correctly ordered than n  must be in the correct place, too
+        # does the axis at the current position need to be swapped?
+        if permutation[i] != current_permutation[i]:
+            # search for current position of the axis to be placed at i!
+            for j in range(i, nr_of_axes):
+                if current_permutation[j] == permutation[i]:
+                    break
+
+            # swap these two axes
+            tensor = swapaxes(tensor, i, j)
+            current_permutation[[i, j]] = current_permutation[[j, i]]
+            # print(current_permutation)
+
+    return alias(tensor, "End_tranpose_" + str(permutation)+ (("_"+name)if name is not None else ""))
 
 
 @typemap
