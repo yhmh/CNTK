@@ -59,7 +59,6 @@ class ObjectDetectionReader:
         else:
             img_data, img_dims = self._load_resize_and_pad_image(index)
         buffered_proposals = self._get_buffered_proposals(index)
-        print("flip: {}".format(self._flip_image))
 
         return img_data, roi_data, img_dims, buffered_proposals
 
