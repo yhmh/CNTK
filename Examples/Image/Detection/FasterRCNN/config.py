@@ -41,7 +41,7 @@ __C.CNTK.USE_MEAN_GRADIENT = False
 __C.CNTK.TRAIN_CONV_LAYERS = False
 
 __C.CNTK.DATASET = "Grocery" # "Grocery" or "Pascal"
-__C.CNTK.BASE_MODEL = "VGG16" # "VGG16" or "AlexNet"
+__C.CNTK.BASE_MODEL = "AlexNet" # "VGG16" or "AlexNet"
 __C.CNTK.CONV_BIAS_INIT = 0.0
 
 # Learning parameters

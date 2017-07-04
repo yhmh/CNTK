@@ -24,13 +24,14 @@ if DEBUG:
 
 class ObjectDetectionReader:
     def __init__(self, img_map_file, roi_map_file, max_annotations_per_image,
-                 pad_width, pad_height, pad_value, randomize, random_flip,
+                 pad_width, pad_height, pad_value, randomize, use_flipping,
                  max_images=None, buffered_rpn_proposals=None):
         self._pad_width = pad_width
         self._pad_height = pad_height
         self._pad_value = pad_value
         self._randomize = randomize
-        self._random_flip = random_flip
+        self._use_flipping = use_flipping
+        self._flip_image = True # will be set to False in the first call to _reset_reading_order
         self._buffered_rpn_proposals = buffered_rpn_proposals
         self._img_file_paths = []
         self._gt_annotations = []
@@ -51,15 +52,14 @@ class ObjectDetectionReader:
         '''
 
         index = self._get_next_image_index()
-        flip_image = np.random.rand() > .5 if self._random_flip else False
-
-        roi_data = self._get_gt_annotations(index, flip_image)
+        roi_data = self._get_gt_annotations(index)
         if DEBUG:
-            img_data, img_dims, resized_with_pad = self._load_resize_and_pad_image(index, flip_image)
+            img_data, img_dims, resized_with_pad = self._load_resize_and_pad_image(index)
             self._debug_plot(resized_with_pad, roi_data)
         else:
-            img_data, img_dims = self._load_resize_and_pad_image(index, flip_image)
-        buffered_proposals = self._get_buffered_proposals(index, flip_image)
+            img_data, img_dims = self._load_resize_and_pad_image(index)
+        buffered_proposals = self._get_buffered_proposals(index)
+        print("flip: {}".format(self._flip_image))
 
         return img_data, roi_data, img_dims, buffered_proposals
 
@@ -130,6 +130,8 @@ class ObjectDetectionReader:
         self._reading_order = np.arange(self._num_images)
         if self._randomize:
             np.random.shuffle(self._reading_order)
+        # if flipping should be used then we alternate between epochs from flipped to non-flipped
+        self._flip_image = not self._flip_image if self._use_flipping else False
 
         self._reading_index = 0
 
@@ -187,7 +189,7 @@ class ObjectDetectionReader:
         self._reading_index += 1
         return next_image_index
 
-    def _load_resize_and_pad_image(self, index, flip_image):
+    def _load_resize_and_pad_image(self, index):
         image_path = self._img_file_paths[index]
 
         img = self._read_image(image_path)
@@ -201,7 +203,7 @@ class ObjectDetectionReader:
         resized = cv2.resize(img, (target_w, target_h), 0, 0, interpolation=cv2.INTER_NEAREST)
         resized_with_pad = cv2.copyMakeBorder(resized, top, bottom, left, right, cv2.BORDER_CONSTANT,
                                               value=self._pad_value)
-        if flip_image:
+        if self._flip_image:
             resized_with_pad = cv2.flip(resized_with_pad, 1)
 
         # transpose(2,0,1) converts the image to the HWC format which CNTK accepts
@@ -213,24 +215,24 @@ class ObjectDetectionReader:
             return model_arg_rep, dims, resized_with_pad
         return model_arg_rep, dims
 
-    def _get_gt_annotations(self, index, flip_image):
+    def _get_gt_annotations(self, index):
         annotations = self._gt_annotations[index]
-        if flip_image:
+        if self._flip_image:
             flipped_annotations = np.array(annotations)
-            flipped_annotations[:,0] = self._pad_width - annotations[:,2]
-            flipped_annotations[:,2] = self._pad_width - annotations[:,0]
+            flipped_annotations[:,0] = self._pad_width - annotations[:,2] - 1
+            flipped_annotations[:,2] = self._pad_width - annotations[:,0] - 1
             return flipped_annotations
         return annotations
 
-    def _get_buffered_proposals(self, index, flip_image):
+    def _get_buffered_proposals(self, index):
         if self._buffered_rpn_proposals is None:
             return None
 
         buffered_proposals = self._buffered_rpn_proposals[index]
-        if flip_image:
+        if self._flip_image:
             flipped_proposals = np.array(buffered_proposals, dtype=np.float32)
-            flipped_proposals[:,0] = self._pad_width - buffered_proposals[:,2]
-            flipped_proposals[:,2] = self._pad_width - buffered_proposals[:,0]
+            flipped_proposals[:,0] = self._pad_width - buffered_proposals[:,2] - 1
+            flipped_proposals[:,2] = self._pad_width - buffered_proposals[:,0] - 1
             return flipped_proposals
         return buffered_proposals
 

@@ -9,6 +9,7 @@ from PIL import Image
 use_relative_coords_ctr_wh = False
 # else: top left and bottom right corner are used (i.e. xmin, ymin, xmax, ymax) in absolute coords
 
+skip_difficult_annotations = True
 use_pad_scale = False
 pad_width = 1000
 pad_height = 1000
@@ -117,10 +118,13 @@ def create_mappings(train, skip_difficult):
                     cls_index = class_dict[cls]
 
                     bbox = obj.findall('bndbox')[0]
-                    xmin = int(bbox.findall('xmin')[0].text)
-                    ymin = int(bbox.findall('ymin')[0].text)
-                    xmax = int(bbox.findall('xmax')[0].text)
-                    ymax = int(bbox.findall('ymax')[0].text)
+                    # subtracting 1 since matlab indexing is 1-based
+                    xmin = int(bbox.findall('xmin')[0].text) - 1
+                    ymin = int(bbox.findall('ymin')[0].text) - 1
+                    xmax = int(bbox.findall('xmax')[0].text) - 1
+                    ymax = int(bbox.findall('ymax')[0].text) - 1
+
+                    assert xmin >= 0 and ymin >= 0 and xmax >= 0 and ymax >=0
 
                     roi_line += format_roi(cls_index, xmin, ymin, xmax, ymax, img_file_path)
 
@@ -134,5 +138,5 @@ def create_mappings(train, skip_difficult):
             cls_file.write("{}\t{}\n".format(cls, class_dict[cls]))
 
 if __name__ == '__main__':
-    create_mappings(True, skip_difficult=True)
-    create_mappings(False, skip_difficult=True)
+    create_mappings(True, skip_difficult=skip_difficult_annotations)
+    create_mappings(False, skip_difficult=skip_difficult_annotations)

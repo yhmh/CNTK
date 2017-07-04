@@ -259,7 +259,7 @@ def train_model(image_input, roi_input, dims_input, loss, pred_error,
         globalvars['train_map_file'], globalvars['train_roi_file'],
         max_annotations_per_image=cfg["CNTK"].INPUT_ROIS_PER_IMAGE,
         pad_width=image_width, pad_height=image_height, pad_value=img_pad_value,
-        randomize=True, random_flip=cfg["TRAIN"].USE_FLIPPED,
+        randomize=True, use_flipping=cfg["TRAIN"].USE_FLIPPED,
         max_images=cfg["CNTK"].NUM_TRAIN_IMAGES,
         buffered_rpn_proposals=buffered_rpn_proposals)
 
@@ -297,7 +297,7 @@ def compute_rpn_proposals(rpn_model, image_input, roi_input, dims_input):
         max_annotations_per_image=cfg["CNTK"].INPUT_ROIS_PER_IMAGE,
         pad_width=image_width, pad_height=image_height, pad_value=img_pad_value,
         max_images=num_images,
-        randomize=False, random_flip=False)
+        randomize=False, use_flipping=False)
 
     # define mapping from reader streams to network inputs
     input_map = {
@@ -569,7 +569,7 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
         img_map_file, roi_map_file,
         max_annotations_per_image=cfg["CNTK"].INPUT_ROIS_PER_IMAGE,
         pad_width=image_width, pad_height=image_height, pad_value=img_pad_value,
-        randomize=False, random_flip=False,
+        randomize=False, use_flipping=False,
         max_images=cfg["CNTK"].NUM_TEST_IMAGES)
 
     # define mapping from reader streams to network inputs
