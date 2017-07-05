@@ -137,7 +137,7 @@ public:
         if (inputIndex == 0)
         {
             // d/dx (ln( exp(x) + (exp(y)) = exp(x) / (exp(x) + exp(y)) = 1 / (1 + exp(y-x)) = sigmoid(x-y)
-            if (Input(inputIndex)->IsGradientOverwrittenBy(this))
+            if (Input(inputIndex)->IsGradientInitializedBy(this))
                 inputGradient.AssignElementwiseProductWithLogSumDerivativeOf(gradient, input1, input0);
             else
                 inputGradient.AddElementwiseProductWithLogSumDerivativeOf(gradient, input1, input0);
@@ -145,7 +145,7 @@ public:
         else
         {
             // d/dy (ln( exp(x) + (exp(y)) = exp(y) / (exp(x) + exp(y)) = 1 / (1 + exp(x-y)) = sigmoid(y-x)
-            if (Input(inputIndex)->IsGradientOverwrittenBy(this))
+            if (Input(inputIndex)->IsGradientInitializedBy(this))
                 inputGradient.AssignElementwiseProductWithLogSumDerivativeOf(gradient, input0, input1);
             else
                 inputGradient.AddElementwiseProductWithLogSumDerivativeOf(gradient, input0, input1);
@@ -351,7 +351,7 @@ public:
         if (c.Input(inputIndex)->ReducesInTimeWrt(c.Input(1 - inputIndex)))
             c.Input(1 - inputIndex)->MaskMissingValueColumnsToZero(fr);
 
-        if (c.Input(inputIndex)->IsGradientOverwrittenBy(&c))
+        if (c.Input(inputIndex)->IsGradientInitializedBy(&c))
             inputGradient.AssignElementwiseProductOf(gradient, otherInputValue);
         else
             inputGradient.AddElementwiseProductOf(gradient, otherInputValue);
@@ -578,7 +578,7 @@ private:
 
         const auto& unpackedInputValue = unpackedInput[1 - inputIndex].GetSOB();
 
-        ElemType beta = InputRef(inputIndex).IsGradientOverwrittenBy(this) ? (ElemType)0 : (ElemType)1;
+        ElemType beta = InputRef(inputIndex).IsGradientInitializedBy(this) ? (ElemType)0 : (ElemType)1;
 
         // note the unpacked input is not the normal MBLayout (batchMajor), so do ColumnSlice directly
         if (inputIndex == 0)
@@ -714,7 +714,7 @@ public:
                     Matrix<ElemType> inputGradient = InputRef(inputIndex).GradientFor(fr);
                     Matrix<ElemType>::ColumnwiseScaleAndWeightedAdd(
                         (ElemType)1.0, inputValue, gradient,
-                        Input(inputIndex)->IsGradientOverwrittenBy(this) ? (ElemType)0.0 : (ElemType)1.0,
+                        Input(inputIndex)->IsGradientInitializedBy(this) ? (ElemType)0.0 : (ElemType)1.0,
                         inputGradient);
                     // TODO: better move this special-casing into TensorView::AssignElementwiseProductOf()
                     // Note: We do not need to mask gaps here, since this code branch operates sample by sample (no reduction over samples).
@@ -730,7 +730,7 @@ public:
             auto sequenceRange = fr.GetSequenceRange();
             // when unroll, parent overwrite gradient should be ignored
             m_beingUnrolled = true;
-            if (Input(inputIndex)->IsGradientOverwrittenBy(this))
+            if (Input(inputIndex)->IsGradientInitializedBy(this))
             {
                 Input(inputIndex)->Gradient().SetValue(0);
             }
@@ -747,7 +747,7 @@ public:
         if (Input(inputIndex)->ReducesInTimeWrt(Input(1 - inputIndex)))
             Input(1 - inputIndex)->MaskMissingValueColumnsToZero(fr);
 
-        bool overwriteInputGradient = (Input(inputIndex)->IsGradientOverwrittenBy(this) && !m_beingUnrolled);
+        bool overwriteInputGradient = (Input(inputIndex)->IsGradientInitializedBy(this) && !m_beingUnrolled);
 
         if (inputIndex == 0) // left derivative
         {

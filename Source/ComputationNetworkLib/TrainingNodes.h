@@ -2254,7 +2254,7 @@ public:
         Matrix<ElemType> sliceInput0Grad = InputRef(0).GradientFor(fr);
         Matrix<ElemType> sliceOutputGrad = GradientFor(fr);
 
-        if (InputRef(0).IsGradientOverwrittenBy(this))
+        if (InputRef(0).IsGradientInitializedBy(this))
         {
             if (IsEnabled())
                 sliceInput0Grad.AssignElementProductOf(sliceOutputGrad, DataFor(*m_maskOfDropout, fr));
@@ -2749,7 +2749,7 @@ public:
         {
             assert(m_gradientValid);
 
-            if (Input(SCALE)->IsGradientOverwrittenBy(this))
+            if (Input(SCALE)->IsGradientInitializedBy(this))
                 Input(SCALE)->Gradient().AssignValuesOf(*m_dScale);
             else
                 Input(SCALE)->Gradient() += *m_dScale;
@@ -2758,7 +2758,7 @@ public:
         {
             assert(m_gradientValid);
 
-            if (Input(BIAS)->IsGradientOverwrittenBy(this))
+            if (Input(BIAS)->IsGradientInitializedBy(this))
                 Input(BIAS)->Gradient().AssignValuesOf(*m_dBias);
             else
                 Input(BIAS)->Gradient() += *m_dBias;

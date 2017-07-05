@@ -130,7 +130,7 @@ template <class ElemType>
 {
     assert(inputIndex == 0), inputIndex;
 
-    bool accumulateGradient = !InputRef(inputIndex).IsGradientOverwrittenBy(this);
+    bool accumulateGradient = !InputRef(inputIndex).IsGradientInitializedBy(this);
     if (ReduceSequenceAxis())
     {
         // Broadcast along the sequence
@@ -550,11 +550,7 @@ template <class ElemType>
         let&  index          = InputRef(INDEXDATA) .Value();    // column indices to copy from
         auto& sourceGradient = InputRef(SOURCEDATA).Gradient(); // source to propagate the gradient intpu
         auto& outputGradient =                      Gradient(); // output gradient to propagate
-        sourceGradient.DoScatterColumnsOf(
-            /*beta=*/InputRef(SOURCEDATA).IsGradientOverwrittenBy(this) ? (ElemType)1 : (ElemType)0,
-            index,
-            outputGradient,
-            /*alpha=*/1);
+        sourceGradient.DoScatterColumnsOf(/*beta=*/1, index, outputGradient, /*alpha=*/1);
     }
 }
 

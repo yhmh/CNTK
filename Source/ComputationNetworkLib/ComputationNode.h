@@ -485,14 +485,14 @@ public:
         return false;
     }
 
-    bool IsGradientOverwrittenBy(const ComputationNodeBase* node) const
+    bool IsGradientInitializedBy(const ComputationNodeBase* node) const
     {
         return (m_gradientInitializedBy == node);
     }
 
     bool IsGradientOptimized(const ComputationNodeBase* parent) const
     {
-        return ParentGradientReused() || IsGradientOverwrittenBy(parent);
+        return ParentGradientReused() || IsGradientInitializedBy(parent);
     }
 
     // interpretation as a Matrix reference
