@@ -589,10 +589,6 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
         minibatch_source.dims_si: dims_input
     }
 
-    img_key = cfg["CNTK"].FEATURE_NODE_NAME
-    roi_key = "x 5]"
-    dims_key = "[6]"
-
     # all detections are collected into:
     #    all_boxes[cls][image] = N x 5 array of detections in
     #    (x1, y1, x2, y2, score)
@@ -604,8 +600,7 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
     for img_i in range(0, num_test_images):
         mb_data = minibatch_source.next_minibatch(1, input_map=input_map)
 
-        rkeys = [k for k in mb_data if roi_key in str(k)]
-        gt_row = mb_data[rkeys[0]].asarray()
+        gt_row = mb_data[roi_input].asarray()
         gt_row = gt_row.reshape((cfg["CNTK"].INPUT_ROIS_PER_IMAGE, 5))
         all_gt_boxes = gt_row[np.where(gt_row[:,-1] > 0)]
 
@@ -621,18 +616,15 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
                                            'difficult': [False] * len(cls_gt_boxes),
                                            'det': [False] * len(cls_gt_boxes)})
 
-        fkeys = [k for k in mb_data if img_key in str(k)]
-        dkeys = [k for k in mb_data if dims_key in str(k)]
-
-        output = frcn_eval.eval({fkeys[0]: mb_data[fkeys[0]], dkeys[0]: mb_data[dkeys[0]]})
+        output = frcn_eval.eval({image_input: mb_data[image_input], dims_input: mb_data[dims_input]})
         out_dict = dict([(k.name, k) for k in output])
-        out_cls_pred = output[out_dict['cls_pred']][0]                      # (300, 17)
+        out_cls_pred = output[out_dict['cls_pred']][0]
         out_rpn_rois = output[out_dict['rpn_rois']][0]
         out_bbox_regr = output[out_dict['bbox_regr']][0]
 
         labels = out_cls_pred.argmax(axis=1)
         scores = out_cls_pred.max(axis=1)
-        regressed_rois = regress_rois(out_rpn_rois, out_bbox_regr, labels)  # (300, 4)
+        regressed_rois = regress_rois(out_rpn_rois, out_bbox_regr, labels, mb_data[dims_input].asarray())
 
         labels.shape = labels.shape + (1,)
         scores.shape = scores.shape + (1,)
@@ -688,7 +680,7 @@ if __name__ == '__main__':
 
         print("Stored eval model at %s" % model_path)
 
-    eval_faster_rcnn_mAP(eval_model, globalvars['test_map_file'], globalvars['test_roi_file'])
+    #eval_faster_rcnn_mAP(eval_model, globalvars['test_map_file'], globalvars['test_roi_file'])
 
     # Plot results on test set
     if cfg["CNTK"].VISUALIZE_RESULTS:

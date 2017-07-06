@@ -174,7 +174,7 @@ def eval_and_plot_faster_rcnn(eval_model, num_images_to_plot, test_map_file, img
             imsave("{}/{}_{}".format(results_base_path, i, os.path.basename(imgPath)), imgDebug)
 
         # apply regression and nms to bbox coordinates
-        regressed_rois = regress_rois(out_rpn_rois, out_bbox_regr, labels)
+        regressed_rois = regress_rois(out_rpn_rois, out_bbox_regr, labels, dims)
 
         nmsKeepIndices = apply_nms_to_single_image_results(regressed_rois, labels, scores,
                                                     nms_threshold=nmsThreshold,
