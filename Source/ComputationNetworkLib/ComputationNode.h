@@ -1778,51 +1778,7 @@ public:
 
     // lazy resetting of gradient
     // This performs the actual zeroing out.
-    void LazyZeroGradient(const ComputationNodeBase* gradientInitializedBy)
-    {
-        if (!m_needsGradient)
-            LogicError("%ls %ls operation: LazyZeroGradient() called although this node needs no gradient.", NodeName().c_str(), OperationName().c_str());
-
-        if (gradientInitializedBy == nullptr)
-            LogicError("%ls %ls operation: LazyZeroGradient() called without gradientInitializedBy.", NodeName().c_str(), OperationName().c_str());
-
-        if (m_gradientInitializedBy != nullptr)
-            return;
-
-        const auto& inputs = gradientInitializedBy->GetInputs();
-        bool isInputOfGradientInitializedBy =
-            inputs.end() != std::find_if(
-                                inputs.begin(),
-                                inputs.end(),
-                                [this](ComputationNodeBasePtr p) 
-                                {
-                                    return &*p == this; 
-                                });
-
-        bool needReset = true;
-        if (isInputOfGradientInitializedBy)
-        {
-            auto opt = gradientInitializedBy->ImplementsGradientOptimization(this);
-            switch(opt)
-            {
-            case ParentGradientOptimization::Overwrite:
-                UpdateDataSize(Gradient());
-                needReset = false;
-                break;
-            case ParentGradientOptimization::Reuse:
-                // don't need update size as parent already set it to the right size
-                needReset = false;
-                break;
-            }
-        }
-
-        if (needReset)
-        {
-            UpdateDataSize(Gradient());
-            ResetGradient(0);
-        }
-        m_gradientInitializedBy = gradientInitializedBy;
-    }
+    void LazyZeroGradient(const ComputationNodeBase* gradientInitializedBy);
 
     void VerifyGradientOptimization(const ComputationNodeBase* gradientInitializedBy) const
     {

@@ -21,6 +21,45 @@ using namespace std;
 // -----------------------------------------------------------------------
 // subroutines for evaluation
 // -----------------------------------------------------------------------
+// lazy resetting of gradient
+// This performs the actual zeroing out.
+template<class ElemType>
+void ComputationNode<ElemType>::LazyZeroGradient(const ComputationNodeBase* gradientInitializedBy)
+{
+    if (!m_needsGradient)
+        LogicError("%ls %ls operation: LazyZeroGradient() called although this node needs no gradient.", NodeName().c_str(), OperationName().c_str());
+
+    if (gradientInitializedBy == nullptr)
+        LogicError("%ls %ls operation: LazyZeroGradient() called without gradientInitializedBy.", NodeName().c_str(), OperationName().c_str());
+
+    if (m_gradientInitializedBy != nullptr)
+        return;
+
+    // gradient optimization to allow parent to overwrite/be reused by non-looping child's gradient instead of accumulating
+    // We cannot enable the gradient overwrite/reuse optimization if this node's parent
+    // has this same node as multiple of its inputs since, in that case the
+    // gradients will flow back from multiple paths of the same parent into the input
+    // nor can we apply gradient optimization for nodes in loop as the gradient needs to be accumulated through time steps
+
+    const auto& inputs = gradientInitializedBy->GetInputs();
+
+    if (!IsPartOfLoop() &&
+        gradientInitializedBy->ImplementsGradientOptimization(this) != ParentGradientOptimization::None &&
+        1 == std::count_if(inputs.begin(), inputs.end(), [this](auto p) { return &*p == this; }))
+    {
+        // don't need update size as parent already set it to the right size when reusing
+        if (!ParentGradientReused())
+        {
+            UpdateDataSize(Gradient());
+        }
+        m_gradientInitializedBy = gradientInitializedBy;
+    }
+    else
+    {
+        UpdateDataSize(Gradient());
+        ResetGradient(0);
+    }
+}
 
 template<class ElemType>
 void ComputationNode<ElemType>::Backprop(const FrameRange& fr, bool childrenInThisLoop, bool childrenInOuterLoop) /*override*/
