@@ -1799,13 +1799,26 @@ public:
                                     return &*p == this; 
                                 });
 
-        if (isInputOfGradientInitializedBy &&
-            gradientInitializedBy->ImplementsGradientOptimization(this) != ParentGradientOptimization::None)
+        bool needReset = true;
+        if (isInputOfGradientInitializedBy)
+        {
+            auto opt = gradientInitializedBy->ImplementsGradientOptimization(this);
+            switch(opt)
+            {
+            case ParentGradientOptimization::Overwrite:
+                UpdateDataSize(Gradient());
+                needReset = false;
+                break;
+            case ParentGradientOptimization::Reuse:
+                // don't need update size as parent already set it to the right size
+                needReset = false;
+                break;
+            }
+        }
+
+        if (needReset)
         {
             UpdateDataSize(Gradient());
-        }
-        else
-        {
             ResetGradient(0);
         }
         m_gradientInitializedBy = gradientInitializedBy;

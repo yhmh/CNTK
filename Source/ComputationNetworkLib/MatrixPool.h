@@ -25,7 +25,7 @@ template <class ElemType>
 struct MemRequestInfo
 {
     DEVICEID_TYPE deviceId;                     // which device to allocate data 
-    std::vector<shared_ptr<Matrix<ElemType>>*> pMatrixPtrs;    // memory pointer 
+    std::vector<shared_ptr<Matrix<ElemType>>*> pMatrixPtrs;    // memory pointers 
     size_t matrixSize;                          // memory size 
     bool mbScale;                               // whether the memory shall be scaled by minibatch size 
     bool isWorkSpace;                           // workspace memory or not, by workspace we indicate whether a memory space will be released very shortly after allocation 
@@ -84,10 +84,10 @@ protected:
     {
         void* pMatrixPtr;
         size_t totalCount;
-        size_t seenCount;
+        size_t releaseCount;
 
         AliasInfo(size_t total = 0)
-            : pMatrixPtr(nullptr), totalCount(total), seenCount(0)
+            : pMatrixPtr(nullptr), totalCount(total), releaseCount(0)
         {
         }
     };
@@ -190,12 +190,12 @@ public:
         if (aliasInfo.pMatrixPtr == nullptr)
             LogicError("double releasing aliased matrix, or releasing before any allocation for the matrix");
 
-        if (aliasInfo.seenCount >= aliasInfo.totalCount)
+        if (aliasInfo.releaseCount >= aliasInfo.totalCount)
             LogicError("number of alias instances exceeded expectation");
 
-        aliasInfo.seenCount++;
+        aliasInfo.releaseCount++;
 
-        if (aliasInfo.seenCount == aliasInfo.totalCount)
+        if (aliasInfo.releaseCount == aliasInfo.totalCount)
         {
             RequestRelease((shared_ptr<Matrix<ElemType>>*)aliasInfo.pMatrixPtr);
             aliasInfo.pMatrixPtr = nullptr;

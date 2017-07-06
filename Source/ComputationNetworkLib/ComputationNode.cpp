@@ -723,7 +723,7 @@ template <class ElemType>
                 child->MaskMissingGradientColumnsToZero(FrameRange(child->GetMBLayout())); // HasNaN() operates on a whole matrix, so first flatten all gaps to 0
                 if (child->Gradient().HasNan("EndBackprop"))
                 {
-                    LogicError("%ls %ls operation unexpectedly produced NaN gradients.", child->NodeName().c_str(), child->OperationName().c_str());
+                    LogicError("%ls %ls operation unexpectedly produced NaN gradients on its input %ls.", NodeName().c_str(), OperationName().c_str(), child->NodeName().c_str());
                 }
             }
         }
