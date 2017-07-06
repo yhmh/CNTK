@@ -35,7 +35,7 @@ __C.CNTK = edict()
 
 __C.CNTK.FAST_MODE = False
 __C.CNTK.MAKE_MODE = False
-__C.CNTK.TRAIN_E2E = False
+__C.CNTK.TRAIN_E2E = True
 __C.CNTK.DEBUG_OUTPUT = True
 __C.CNTK.USE_MEAN_GRADIENT = False
 __C.CNTK.TRAIN_CONV_LAYERS = False
@@ -51,8 +51,8 @@ __C.CNTK.MOMENTUM_PER_MB = 0.9
 # E2E config
 # Caffe Faster R-CNN parameters are: base_lr: 0.001, lr_policy: "step", gamma: 0.1, stepsize: 50000, momentum: 0.9, weight_decay: 0.0005
 # ==> CNTK: lr_per_sample = [0.001] * 10 + [0.0001] * 10 + [0.00001]
-__C.CNTK.E2E_MAX_EPOCHS = 20
-__C.CNTK.E2E_LR_PER_SAMPLE = [0.001] * 10 + [0.0001] * 10 + [0.00001]
+__C.CNTK.E2E_MAX_EPOCHS = 30
+__C.CNTK.E2E_LR_PER_SAMPLE = [0.00001] * 10 + [0.000001] * 10 + [0.0000001]
 
 # caffe rpn training: lr = [0.001] * 12 + [0.0001] * 4, momentum = 0.9, weight decay = 0.0005 (cf. stage1_rpn_solver60k80k.pt)
 __C.CNTK.RPN_EPOCHS = 8 # 16

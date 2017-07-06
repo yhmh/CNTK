@@ -44,6 +44,7 @@ from utils.map.map_helpers import evaluate_detections
 from config import cfg
 from od_mb_source import ObjectDetectionMinibatchSource
 from cntk_helpers import regress_rois
+from cntk_debug_single import DebugLayerSingle
 
 ###############################################################
 ###############################################################
@@ -128,6 +129,7 @@ def parse_arguments():
     globalvars['momentum_per_mb'] = cfg["CNTK"].MOMENTUM_PER_MB
     globalvars['rpn_epochs'] = 1 if cfg["CNTK"].FAST_MODE else cfg["CNTK"].RPN_EPOCHS
     globalvars['frcn_epochs'] = 1 if cfg["CNTK"].FAST_MODE else cfg["CNTK"].FRCN_EPOCHS
+    globalvars['e2e_epochs'] = 1 if cfg["CNTK"].FAST_MODE else cfg["CNTK"].E2E_MAX_EPOCHS
     if args['rndSeed'] is not None:
         globalvars['rnd_seed'] = args['rndSeed']
     if args['trainConv'] is not None:
@@ -167,14 +169,17 @@ def parse_arguments():
 
     # report args
     print("Using the following parameters:")
+    print("Flip image       : {}".format(cfg["TRAIN"].USE_FLIPPED))
     print("Train conv layers: {}".format(globalvars['train_conv']))
     print("Random seed      : {}".format(globalvars['rnd_seed']))
-    print("RPN lr factor    : {}".format(globalvars['rpn_lr_factor']))
-    print("RPN epochs       : {}".format(globalvars['rpn_epochs']))
-    print("FRCN lr factor   : {}".format(globalvars['frcn_lr_factor']))
-    print("FRCN epochs      : {}".format(globalvars['frcn_epochs']))
     print("Momentum per MB  : {}".format(globalvars['momentum_per_mb']))
-    print("Flip image       : {}".format(cfg["TRAIN"].USE_FLIPPED))
+    if cfg["CNTK"].TRAIN_E2E:
+        print("RPN epochs       : {}".format(globalvars['e2e_epochs']))
+    else:
+        print("RPN lr factor    : {}".format(globalvars['rpn_lr_factor']))
+        print("RPN epochs       : {}".format(globalvars['rpn_epochs']))
+        print("FRCN lr factor   : {}".format(globalvars['frcn_lr_factor']))
+        print("FRCN epochs      : {}".format(globalvars['frcn_epochs']))
 
 ###############################################################
 ###############################################################
@@ -195,6 +200,7 @@ def clone_model(base_model, from_node_names, to_node_names, clone_method):
 def create_fast_rcnn_predictor(conv_out, rois, fc_layers):
     # RCNN
     roi_out = roipooling(conv_out, rois, cntk.MAX_POOLING, (roi_dim, roi_dim), spatial_scale=1/16.0)
+    #roi_out = user_function(DebugLayerSingle(roi_out, debug_name="roi_out_debug"))
     fc_out = fc_layers(roi_out)
 
     # prediction head
@@ -238,7 +244,7 @@ def create_faster_rcnn_predictor(features, scaled_gt_boxes, dims_input):
     loss = rpn_losses + detection_losses
     pred_error = classification_error(cls_score, label_targets, axis=1)
 
-    return cls_score, loss, pred_error
+    return loss, pred_error
 
 def train_model(image_input, roi_input, dims_input, loss, pred_error,
                 lr_schedule, mm_schedule, l2_reg_weight, epochs_to_train,
@@ -327,9 +333,10 @@ def train_faster_rcnn_e2e(debug_output=False):
     image_input = input_variable((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()], name=feature_node_name)
     roi_input = input_variable((cfg["CNTK"].INPUT_ROIS_PER_IMAGE, 5), dynamic_axes=[Axis.default_batch_axis()])
     dims_input = input_variable((6), dynamic_axes=[Axis.default_batch_axis()])
+    dims_node = alias(dims_input, name='dims_input')
 
     # Instantiate the Faster R-CNN prediction model and loss function
-    predictions, loss, pred_error = create_faster_rcnn_predictor(image_input, roi_input, dims_input)
+    loss, pred_error = create_faster_rcnn_predictor(image_input, roi_input, dims_node)
 
     if debug_output:
         print("Storing graphs and models to %s." % globalvars['output_path'])
@@ -340,11 +347,30 @@ def train_faster_rcnn_e2e(debug_output=False):
     lr_schedule = learning_rate_schedule(lr_per_sample, unit=UnitType.sample)
     mm_schedule = momentum_schedule(cfg["CNTK"].MOMENTUM_PER_MB)
 
-    train_model(image_input, roi_input, dims_input, loss, pred_error,
-                lr_schedule, mm_schedule, cfg["CNTK"].L2_REG_WEIGHT, cfg["CNTK"].E2E_MAX_EPOCHS)
+    print("Using base model:   {}".format(cfg["CNTK"].BASE_MODEL))
+    print("lr_per_sample:      {}".format(lr_per_sample))
 
-    # TODO: return eval model
-    return loss
+    train_model(image_input, roi_input, dims_input, loss, pred_error,
+                lr_schedule, mm_schedule, cfg["CNTK"].L2_REG_WEIGHT, globalvars['e2e_epochs'])
+
+    return create_eval_model(loss, image_input, dims_input)
+
+def create_eval_model(model, image_input, dims_input):
+    print("creating eval model")
+    conv_layers = clone_model(model, [feature_node_name], [last_conv_node_name], CloneMethod.freeze)
+    rpn = clone_model(model, [last_conv_node_name, "dims_input"], ["rpn_rois"], CloneMethod.freeze)
+    roi_fc_layers = clone_model(model, [last_conv_node_name, "rpn_target_rois"], ["cls_score", "bbox_regr"], CloneMethod.freeze)
+
+    conv_out = conv_layers(image_input)
+    rpn_rois = rpn(conv_out, dims_input)
+    pred_net = roi_fc_layers(conv_out, rpn_rois)
+    cls_score = pred_net.outputs[0]
+    bbox_regr = pred_net.outputs[1]
+
+    cls_pred = softmax(cls_score, axis=1, name='cls_pred')
+    eval_model = combine([cls_pred, rpn_rois, bbox_regr])
+
+    return eval_model
 
 # Trains a Faster R-CNN model using 4-stage alternating training
 def train_faster_rcnn_alternating(debug_output=False):
@@ -540,23 +566,7 @@ def train_faster_rcnn_alternating(debug_output=False):
                     rpn_rois_input=rpn_rois_input, buffered_rpn_proposals=buffered_proposals_s2)
         buffered_proposals_s2 = None
 
-    print("creating eval model")
-    if True:
-        conv_layers = clone_model(stage2_frcn_network, [feature_node_name], [last_conv_node_name], CloneMethod.freeze)
-        rpn = clone_model(stage2_rpn_network, [last_conv_node_name, "dims_input"], ["rpn_rois"], CloneMethod.freeze)
-        roi_fc_layers = clone_model(stage2_frcn_network, [last_conv_node_name, "rpn_target_rois"], ["cls_score", "bbox_regr"], CloneMethod.freeze)
-
-        conv_out = conv_layers(image_input)
-        rpn_rois = rpn(conv_out, dims_input)
-        pred_net = roi_fc_layers(conv_out, rpn_rois)
-        cls_score = pred_net.outputs[0]
-        bbox_regr = pred_net.outputs[1]
-
-        cls_pred = softmax(cls_score, axis=1, name='cls_pred')
-        eval_model = combine([cls_pred, rpn_rois, bbox_regr])
-
-    # return stage 2 model
-    return eval_model
+    return create_eval_model(stage2_frcn_network, image_input, dims_input)
 
 def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
     image_input = input_variable((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()], name=feature_node_name)
@@ -645,7 +655,6 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
         ap_list += [aps[class_name]]
         print('AP for {:>15} = {:.4f}'.format(class_name, aps[class_name]))
     print('Mean AP = {:.4f}'.format(np.nanmean(ap_list)))
-
 
 # The main method trains and evaluates a Fast R-CNN model.
 # If a trained model is already available it is loaded an no training will be performed.
