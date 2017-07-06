@@ -43,9 +43,10 @@ void ComputationNode<ElemType>::LazyZeroGradient(const ComputationNodeBase* grad
 
     const auto& inputs = gradientInitializedBy->GetInputs();
 
-    if (!IsPartOfLoop() &&
+    if (Globals::ShouldOptimizeGradientAccumulation() &&
+        !IsPartOfLoop() &&
         gradientInitializedBy->ImplementsGradientOptimization(this) != ParentGradientOptimization::None &&
-        1 == std::count_if(inputs.begin(), inputs.end(), [this](auto p) { return &*p == this; }))
+        1 == std::count_if(inputs.begin(), inputs.end(), [this](ComputationNodeBasePtr p) { return &*p == this; }))
     {
         // don't need update size as parent already set it to the right size when reusing
         if (!ParentGradientReused())
