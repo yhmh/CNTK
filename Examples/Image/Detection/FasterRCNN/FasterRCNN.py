@@ -44,7 +44,7 @@ from utils.map.map_helpers import evaluate_detections
 from config import cfg
 from od_mb_source import ObjectDetectionMinibatchSource
 from cntk_helpers import regress_rois
-from cntk_debug_single import DebugLayerSingle
+#from cntk_debug_single import DebugLayerSingle
 
 ###############################################################
 ###############################################################
