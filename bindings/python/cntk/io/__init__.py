@@ -128,7 +128,7 @@ class MinibatchSource(cntk_py.MinibatchSource):
           **Important:**
           Click :cntkwiki:`here <BrainScript-epochSize-and-Python-epoch_size-in-CNTK>`
           for a description of input and label samples.
-        max_sweeps (`int`, defaults to :const:`cntk.io.INFINITELY_REPEAT`): The maximum number of of sweeps over
+        max_sweeps (`int`, defaults to :const:`cntk.io.INFINITELY_REPEAT`): The maximum number of sweeps over
           the input dataset After this number has been reached, the reader returns empty minibatches on
           subsequent calls to func:`next_minibatch`. `max_samples` and `max_sweeps` are mutually exclusive,
           an exception will be raised if both have non-default values.
@@ -200,6 +200,7 @@ class MinibatchSource(cntk_py.MinibatchSource):
         # transplant into this class instance
         self.__dict__ = source.__dict__
         self._streams = None
+        self._last_mb_data = None
 
     def stream_infos(self):
         '''
@@ -282,6 +283,9 @@ class MinibatchSource(cntk_py.MinibatchSource):
              be a mapping of :class:`~cntk.variables.Variable` to class:`MinibatchData`.
              When the maximum number of epochs/samples is exhausted, the return value is an empty dict.
         '''
+        if self._last_mb_data is not None:
+            self._last_mb_data.clear()
+
         if device is None:
             device = use_default_device()
 
@@ -303,7 +307,11 @@ class MinibatchSource(cntk_py.MinibatchSource):
         if not input_map:
             return mb
 
-        return {key: mb[value] for (key, value) in input_map.items()}
+        # We copy minibatch data here,
+        # we need to make sure it is cleaned when next_minibatch
+        # is called next time.       
+        self._last_mb_data = {key: mb[value] for (key, value) in input_map.items()}
+        return self._last_mb_data
 
     def get_checkpoint_state(self):
         '''
