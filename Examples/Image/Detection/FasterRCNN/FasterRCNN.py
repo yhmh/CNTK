@@ -114,36 +114,44 @@ def parse_arguments():
     parser.add_argument('-rpnLrFactor', '--rpnLrFactor', type=float, help="Scale factor for rpn lr schedule", required=False, default=1.0)
     parser.add_argument('-frcnLrFactor', '--frcnLrFactor', type=float, help="Scale factor for frcn lr schedule", required=False, default=1.0)
     parser.add_argument('-momentumPerMb', '--momentumPerMb', type=float, help="momentum per minibatch", required=False)
+    parser.add_argument('-e2eEpochs', '--e2eEpochs', type=int, help="number of epochs for e2e training", required=False)
     parser.add_argument('-rpnEpochs', '--rpnEpochs', type=int, help="number of epochs for rpn training", required=False)
     parser.add_argument('-frcnEpochs', '--frcnEpochs', type=int, help="number of epochs for frcn training", required=False)
     parser.add_argument('-rndSeed', '--rndSeed', type=int, help="the random seed", required=False)
     parser.add_argument('-trainConv', '--trainConv', type=int, help="whether to train conv layers", required=False)
+    parser.add_argument('-trainE2E', '--trainE@E', type=int, help="whether to train conv layers", required=False)
 
     args = vars(parser.parse_args())
 
     # set and overwrite learning parameters
-    globalvars['rnd_seed'] = cfg.RNG_SEED
-    globalvars['train_conv'] = cfg["CNTK"].TRAIN_CONV_LAYERS
     globalvars['rpn_lr_factor'] = 1.0
     globalvars['frcn_lr_factor'] = 1.0
     globalvars['momentum_per_mb'] = cfg["CNTK"].MOMENTUM_PER_MB
+    globalvars['e2e_epochs'] = 1 if cfg["CNTK"].FAST_MODE else cfg["CNTK"].E2E_MAX_EPOCHS
     globalvars['rpn_epochs'] = 1 if cfg["CNTK"].FAST_MODE else cfg["CNTK"].RPN_EPOCHS
     globalvars['frcn_epochs'] = 1 if cfg["CNTK"].FAST_MODE else cfg["CNTK"].FRCN_EPOCHS
-    globalvars['e2e_epochs'] = 1 if cfg["CNTK"].FAST_MODE else cfg["CNTK"].E2E_MAX_EPOCHS
-    if args['rndSeed'] is not None:
-        globalvars['rnd_seed'] = args['rndSeed']
-    if args['trainConv'] is not None:
-        globalvars['train_conv'] = True if args['trainConv']==1 else False
+    globalvars['rnd_seed'] = cfg.RNG_SEED
+    globalvars['train_conv'] = cfg["CNTK"].TRAIN_CONV_LAYERS
+    globalvars['train_e2e'] = cfg["CNTK"].TRAIN_E2E
+
     if args['rpnLrFactor'] is not None:
         globalvars['rpn_lr_factor'] = args['rpnLrFactor']
     if args['frcnLrFactor'] is not None:
         globalvars['frcn_lr_factor'] = args['frcnLrFactor']
     if args['momentumPerMb'] is not None:
         globalvars['momentum_per_mb'] = args['momentumPerMb']
+    if args['e2eEpochs'] is not None:
+        globalvars['e2e_epochs'] = args['e2eEpochs']
     if args['rpnEpochs'] is not None:
         globalvars['rpn_epochs'] = args['rpnEpochs']
     if args['frcnEpochs'] is not None:
         globalvars['frcn_epochs'] = args['frcnEpochs']
+    if args['rndSeed'] is not None:
+        globalvars['rnd_seed'] = args['rndSeed']
+    if args['trainConv'] is not None:
+        globalvars['train_conv'] = True if args['trainConv']==1 else False
+    if args['trainE2E'] is not None:
+        globalvars['train_e2e'] = True if args['trainE2E']==1 else False
 
     if args['outputdir'] is not None:
         globalvars['output_path'] = args['outputdir']
@@ -173,7 +181,7 @@ def parse_arguments():
     print("Train conv layers: {}".format(globalvars['train_conv']))
     print("Random seed      : {}".format(globalvars['rnd_seed']))
     print("Momentum per MB  : {}".format(globalvars['momentum_per_mb']))
-    if cfg["CNTK"].TRAIN_E2E:
+    if globalvars['train_e2e']:
         print("E2E epochs       : {}".format(globalvars['e2e_epochs']))
     else:
         print("RPN lr factor    : {}".format(globalvars['rpn_lr_factor']))
@@ -655,24 +663,29 @@ def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
 # The main method trains and evaluates a Fast R-CNN model.
 # If a trained model is already available it is loaded an no training will be performed.
 if __name__ == '__main__':
-    if os.path.exists(map_file_path):
+    running_locally = os.path.exists(map_file_path)
+    if running_locally:
         os.chdir(map_file_path)
         if not os.path.exists(os.path.join(abs_path, "Output")):
             os.makedirs(os.path.join(abs_path, "Output"))
         if not os.path.exists(os.path.join(abs_path, "Output", cfg["CNTK"].DATASET)):
             os.makedirs(os.path.join(abs_path, "Output", cfg["CNTK"].DATASET))
+    else:
+        # disable debug and plot outputs when running on Philly
+        cfg["CNTK"].DEBUG_OUTPUT = False
+        cfg["CNTK"].VISUALIZE_RESULTS = False
 
     parse_arguments()
     np.random.seed(seed=globalvars['rnd_seed'])
     model_path = os.path.join(globalvars['output_path'], "faster_rcnn_eval_{}_{}.model"
-                              .format(cfg["CNTK"].BASE_MODEL, "e2e" if cfg["CNTK"].TRAIN_E2E else "4stage"))
+                              .format(cfg["CNTK"].BASE_MODEL, "e2e" if globalvars['train_e2e'] else "4stage"))
 
     # Train only if no model exists yet
     if os.path.exists(model_path) and cfg["CNTK"].MAKE_MODE:
         print("Loading existing model from %s" % model_path)
         eval_model = load_model(model_path)
     else:
-        if cfg["CNTK"].TRAIN_E2E:
+        if globalvars['train_e2e']:
             eval_model = train_faster_rcnn_e2e(debug_output=cfg["CNTK"].DEBUG_OUTPUT)
         else:
             eval_model = train_faster_rcnn_alternating(debug_output=cfg["CNTK"].DEBUG_OUTPUT)
@@ -680,7 +693,7 @@ if __name__ == '__main__':
         eval_model.save(model_path)
         if cfg["CNTK"].DEBUG_OUTPUT:
             plot(eval_model, os.path.join(globalvars['output_path'], "graph_frcn_eval_{}_{}.{}"
-                                          .format(cfg["CNTK"].BASE_MODEL, "e2e" if cfg["CNTK"].TRAIN_E2E else "4stage", cfg["CNTK"].GRAPH_TYPE)))
+                                          .format(cfg["CNTK"].BASE_MODEL, "e2e" if globalvars['train_e2e'] else "4stage", cfg["CNTK"].GRAPH_TYPE)))
 
         print("Stored eval model at %s" % model_path)
 
