@@ -162,12 +162,17 @@ public:
         auto gradient      =                      GradientFor(fr);
         auto inputGradient = InputRef(inputIndex).GradientFor(fr);
 
-        if (Input(inputIndex)->ParentGradientReused())
+        if (Input(inputIndex)->IsGradientOptimized(this))
         {
-            if (gradient.Data() != inputGradient.Data() ||
-                gradient.GetNumRows() != inputGradient.GetNumRows() ||
-                gradient.GetNumCols() != inputGradient.GetNumCols())
-                LogicError("Gradient should be reused");
+            if (Input(inputIndex)->ParentGradientReused())
+            {
+                if (gradient.Data() != inputGradient.Data() ||
+                    gradient.GetNumRows() != inputGradient.GetNumRows() ||
+                    gradient.GetNumCols() != inputGradient.GetNumCols())
+                    LogicError("Gradient should be reused");
+            }
+            else
+                inputGradient.AssignValuesOf(gradient.Reshaped(inputGradient.GetNumRows(), inputGradient.GetNumCols()));
         }
         else
             inputGradient += gradient.Reshaped(inputGradient.GetNumRows(), inputGradient.GetNumCols());
