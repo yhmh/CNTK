@@ -487,7 +487,7 @@ BOOST_AUTO_TEST_CASE(PoolingBackward)
                 testEng->BackwardPooling(out, srcGrad, in, grad, true);
                 baseEng->BackwardPooling(outB, srcGradB, inB, gradB, true);
 
-                SingleMatrix gradReset = initMat(gradBuf, crowIn, n, buf);
+                SingleMatrix gradReset(grad.DeepClone(), baseDeviceId);
                 SingleMatrix gradBReset(grad.DeepClone(), baseDeviceId);
                 testEng->BackwardPooling(out, srcGrad, in, gradReset, false);
                 baseEng->BackwardPooling(outB, srcGradB, inB, gradBReset, false);
