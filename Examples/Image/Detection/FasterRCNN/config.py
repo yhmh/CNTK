@@ -34,11 +34,11 @@ cfg = __C
 __C.CNTK = edict()
 
 __C.CNTK.FAST_MODE = False
-__C.CNTK.MAKE_MODE = True
-__C.CNTK.TRAIN_E2E = True
+__C.CNTK.MAKE_MODE = False
+__C.CNTK.TRAIN_E2E = False
 __C.CNTK.DEBUG_OUTPUT = True
 __C.CNTK.USE_MEAN_GRADIENT = False
-__C.CNTK.TRAIN_CONV_LAYERS = False
+__C.CNTK.TRAIN_CONV_LAYERS = True
 
 __C.CNTK.DATASET = "Grocery" # "Grocery" or "Pascal"
 __C.CNTK.BASE_MODEL = "VGG16" # "VGG16" or "AlexNet"
@@ -56,14 +56,14 @@ __C.CNTK.E2E_MAX_EPOCHS = 20
 __C.CNTK.E2E_LR_PER_SAMPLE = [0.00001] * 10 + [0.000001] * 10 + [0.0000001]
 
 # caffe rpn training: lr = [0.001] * 12 + [0.0001] * 4, momentum = 0.9, weight decay = 0.0005 (cf. stage1_rpn_solver60k80k.pt)
-__C.CNTK.RPN_EPOCHS = 8 # 16
+__C.CNTK.RPN_EPOCHS = 4 # 16
 __C.CNTK.RPN_LR_PER_SAMPLE = [0.001] * 6 + [0.0001] * 4
 
 # caffe frcn training: lr = [0.001] * 6 + [0.0001] * 2, momentum = 0.9, weight decay = 0.0005 (cf. stage1_fast_rcnn_solver30k40k.pt)
 #__C.CNTK.FRCN_EPOCHS = 8
 #__C.CNTK.FRCN_LR_PER_SAMPLE = [0.001] * 6 + [0.00001] * 2
 # Current setting for CNTK AlexNet (92.5 mAP on Grocery):
-__C.CNTK.FRCN_EPOCHS = 30
+__C.CNTK.FRCN_EPOCHS = 10
 __C.CNTK.FRCN_LR_PER_SAMPLE = [0.000015] * 8 + [0.00001] * 8 + [0.000001]
 # Current setting for CNTK VGG16:
 #__C.CNTK.FRCN_EPOCHS = 20

@@ -119,7 +119,7 @@ def parse_arguments():
     parser.add_argument('-frcnEpochs', '--frcnEpochs', type=int, help="number of epochs for frcn training", required=False)
     parser.add_argument('-rndSeed', '--rndSeed', type=int, help="the random seed", required=False)
     parser.add_argument('-trainConv', '--trainConv', type=int, help="whether to train conv layers", required=False)
-    parser.add_argument('-trainE2E', '--trainE@E', type=int, help="whether to train conv layers", required=False)
+    parser.add_argument('-trainE2E', '--trainE2E', type=int, help="whether to train conv layers", required=False)
 
     args = vars(parser.parse_args())
 
