@@ -35,13 +35,13 @@ __C.CNTK = edict()
 
 __C.CNTK.FAST_MODE = False
 __C.CNTK.MAKE_MODE = True
-__C.CNTK.TRAIN_E2E = False
+__C.CNTK.TRAIN_E2E = True
 __C.CNTK.DEBUG_OUTPUT = True
 __C.CNTK.USE_MEAN_GRADIENT = False
 __C.CNTK.TRAIN_CONV_LAYERS = False
 
-__C.CNTK.DATASET = "Pascal" # "Grocery" or "Pascal"
-__C.CNTK.BASE_MODEL = "AlexNet" # "VGG16" or "AlexNet"
+__C.CNTK.DATASET = "Grocery" # "Grocery" or "Pascal"
+__C.CNTK.BASE_MODEL = "VGG16" # "VGG16" or "AlexNet"
 __C.CNTK.CONV_BIAS_INIT = 0.0
 
 # Learning parameters
@@ -51,7 +51,7 @@ __C.CNTK.MOMENTUM_PER_MB = 0.9
 # E2E config
 # Caffe Faster R-CNN parameters are: base_lr: 0.001, lr_policy: "step", gamma: 0.1, stepsize: 50000, momentum: 0.9, weight_decay: 0.0005
 # ==> CNTK: lr_per_sample = [0.001] * 10 + [0.0001] * 10 + [0.00001]
-# Current setting for CNTK AlexNet (92.7 mAP on Grocery):
+# Current setting for CNTK on Grocery (AlexNet: 92.7 mAP, VGG 93.2 mAP):
 __C.CNTK.E2E_MAX_EPOCHS = 20
 __C.CNTK.E2E_LR_PER_SAMPLE = [0.00001] * 10 + [0.000001] * 10 + [0.0000001]
 
@@ -75,11 +75,11 @@ __C.CNTK.IMAGE_WIDTH = 850 # 1000
 __C.CNTK.IMAGE_HEIGHT = 850 # 1000
 
 __C.CNTK.RESULTS_NMS_THRESHOLD = 0.3
-__C.CNTK.RESULTS_NMS_CONF_THRESHOLD = 0.3
+__C.CNTK.RESULTS_NMS_CONF_THRESHOLD = 0.0
 __C.CNTK.RESULTS_BGR_PLOT_THRESHOLD = 0.3
 
 __C.CNTK.GRAPH_TYPE = "png" # "png" or "pdf"
-__C.CNTK.VISUALIZE_RESULTS = True
+__C.CNTK.VISUALIZE_RESULTS = False
 __C.CNTK.DRAW_NEGATIVE_ROIS = False
 __C.CNTK.DRAW_UNREGRESSED_ROIS = False
 
@@ -124,7 +124,7 @@ if __C.CNTK.DATASET == "Pascal":
 if __C.CNTK.BASE_MODEL == "AlexNet":
     __C.CNTK.BASE_MODEL_FILE = "AlexNet.model"
     __C.CNTK.FEATURE_NODE_NAME = "features"
-    __C.CNTK.LAST_CONV_NODE_NAME = "conv5.y"
+    __C.CNTK.LAST_CONV_NODE_NAME = "conv5.y" # == relu
     __C.CNTK.START_TRAIN_CONV_NODE_NAME = "conv3.y"
     __C.CNTK.POOL_NODE_NAME = "pool3"
     __C.CNTK.LAST_HIDDEN_NODE_NAME = "h2_d"
@@ -133,8 +133,8 @@ if __C.CNTK.BASE_MODEL == "AlexNet":
 if __C.CNTK.BASE_MODEL == "VGG16":
     __C.CNTK.BASE_MODEL_FILE = "VGG16_ImageNet_Caffe.model" # "VGG16_ImageNet.cntkmodel"
     __C.CNTK.FEATURE_NODE_NAME = "data"
-    __C.CNTK.LAST_CONV_NODE_NAME = "conv5_3"
-    __C.CNTK.START_TRAIN_CONV_NODE_NAME = "conv3_1"
+    __C.CNTK.LAST_CONV_NODE_NAME = "relu5_3"
+    __C.CNTK.START_TRAIN_CONV_NODE_NAME = "pool2"
     __C.CNTK.POOL_NODE_NAME = "pool5"
     __C.CNTK.LAST_HIDDEN_NODE_NAME = "drop7"
     __C.CNTK.ROI_DIM = 7

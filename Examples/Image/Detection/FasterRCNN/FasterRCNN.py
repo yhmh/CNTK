@@ -174,7 +174,7 @@ def parse_arguments():
     print("Random seed      : {}".format(globalvars['rnd_seed']))
     print("Momentum per MB  : {}".format(globalvars['momentum_per_mb']))
     if cfg["CNTK"].TRAIN_E2E:
-        print("RPN epochs       : {}".format(globalvars['e2e_epochs']))
+        print("E2E epochs       : {}".format(globalvars['e2e_epochs']))
     else:
         print("RPN lr factor    : {}".format(globalvars['rpn_lr_factor']))
         print("RPN epochs       : {}".format(globalvars['rpn_epochs']))
@@ -219,6 +219,10 @@ def create_fast_rcnn_predictor(conv_out, rois, fc_layers):
 def create_faster_rcnn_predictor(features, scaled_gt_boxes, dims_input):
     # Load the pre-trained classification net and clone layers
     base_model = load_model(base_model_file)
+
+    #if cfg["CNTK"].DEBUG_OUTPUT:
+    #    plot(base_model, os.path.join(globalvars['output_path'], "graph_base_model.{}".format(cfg["CNTK"].GRAPH_TYPE)))
+
     conv_layers = clone_model(base_model, [feature_node_name], [last_conv_node_name], clone_method=CloneMethod.freeze)
     fc_layers = clone_model(base_model, [pool_node_name], [last_hidden_node_name], clone_method=CloneMethod.clone)
 
@@ -680,7 +684,7 @@ if __name__ == '__main__':
 
         print("Stored eval model at %s" % model_path)
 
-    #eval_faster_rcnn_mAP(eval_model, globalvars['test_map_file'], globalvars['test_roi_file'])
+    eval_faster_rcnn_mAP(eval_model, globalvars['test_map_file'], globalvars['test_roi_file'])
 
     # Plot results on test set
     if cfg["CNTK"].VISUALIZE_RESULTS:

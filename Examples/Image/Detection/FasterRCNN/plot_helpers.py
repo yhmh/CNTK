@@ -54,6 +54,12 @@ def visualizeResultsFaster(imgPath, roiLabels, roiScores, roiRelCoords, padWidth
     assert(len(roiLabels) == len(roiRelCoords))
     if roiScores:
         assert(len(roiLabels) == len(roiScores))
+        minScore = min(roiScores)
+        print("roiScores min: {}, max: {}, threshold: {}".format(minScore, max(roiScores), decisionThreshold))
+        if minScore < decisionThreshold:
+            decisionThreshold = minScore * 0.5
+            print("reset decision threshold to: {}".format(decisionThreshold))
+            #pdb.set_trace()
 
     # draw multiple times to avoid occlusions
     for iter in range(0,3):
