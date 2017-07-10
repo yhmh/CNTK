@@ -17,6 +17,8 @@
 
 %implicitconv CNTK::Variable;
 
+%template() std::vector<CNTK::SequenceDescription>;
+
 %rename(_forward) CNTK::Function::Forward;
 %rename(_add_progress_writers) CNTK::Internal::AddProgressWriters;
 %rename(_backward) CNTK::Function::Backward;
@@ -107,6 +109,8 @@
 %template() std::vector<CNTK::DeviceDescriptor>;
 %template() std::vector<CNTK::StreamConfiguration>;
 %template() std::vector<CNTK::StreamInformation>;
+%template() std::vector<CNTK::ChunkDescription>;
+%template() std::vector<CNTK::SequenceDescription>;
 %template() std::vector<CNTK::HTKFeatureConfiguration>;
 %template() std::vector<std::shared_ptr<CNTK::NDArrayView>>;
 %template() std::vector<std::shared_ptr<CNTK::Value>>;
@@ -667,6 +671,7 @@ public:
 
 %{
     #include "CNTKLibrary.h"
+    #include "CNTKLibraryExperimental.h"
     #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
     #include "numpy/ndarraytypes.h"
     #include "numpy/arrayobject.h"
@@ -1404,6 +1409,8 @@ std::unordered_map<CNTK::StreamInformation, std::pair<CNTK::NDArrayViewPtr, CNTK
 %shared_ptr(CNTK::BackPropState)
 %shared_ptr(CNTK::Learner)
 %shared_ptr(CNTK::MinibatchSource)
+%shared_ptr(CNTK::DataDeserializer)
+%shared_ptr(CNTK::Chunk)
 %shared_ptr(CNTK::DistributedCommunicator)
 %shared_ptr(CNTK::QuantizedDistributedCommunicator)
 %shared_ptr(CNTK::DistributedLearner)
@@ -1412,6 +1419,7 @@ std::unordered_map<CNTK::StreamInformation, std::pair<CNTK::NDArrayViewPtr, CNTK
 %shared_ptr(CNTK::Internal::UDFDeserializeCallbackWrapper)
 
 %include "CNTKLibraryInternals.h"
+%include "CNTKLibraryExperimental.h"
 %include "CNTKLibrary.h"
 
 %inline %{
