@@ -113,19 +113,21 @@ def parse_arguments():
                         required=False, default=None)
     parser.add_argument('-rpnLrFactor', '--rpnLrFactor', type=float, help="Scale factor for rpn lr schedule", required=False, default=1.0)
     parser.add_argument('-frcnLrFactor', '--frcnLrFactor', type=float, help="Scale factor for frcn lr schedule", required=False, default=1.0)
+    parser.add_argument('-e2eLrFactor', '--e2eLrFactor', type=float, help="Scale factor for e2e lr schedule", required=False, default=1.0)
     parser.add_argument('-momentumPerMb', '--momentumPerMb', type=float, help="momentum per minibatch", required=False)
     parser.add_argument('-e2eEpochs', '--e2eEpochs', type=int, help="number of epochs for e2e training", required=False)
     parser.add_argument('-rpnEpochs', '--rpnEpochs', type=int, help="number of epochs for rpn training", required=False)
     parser.add_argument('-frcnEpochs', '--frcnEpochs', type=int, help="number of epochs for frcn training", required=False)
     parser.add_argument('-rndSeed', '--rndSeed', type=int, help="the random seed", required=False)
     parser.add_argument('-trainConv', '--trainConv', type=int, help="whether to train conv layers", required=False)
-    parser.add_argument('-trainE2E', '--trainE2E', type=int, help="whether to train conv layers", required=False)
+    parser.add_argument('-trainE2E', '--trainE2E', type=int, help="whether to train e2e (otherwise 4 stage)", required=False)
 
     args = vars(parser.parse_args())
 
     # set and overwrite learning parameters
     globalvars['rpn_lr_factor'] = 1.0
     globalvars['frcn_lr_factor'] = 1.0
+    globalvars['e2e_lr_factor'] = 1.0
     globalvars['momentum_per_mb'] = cfg["CNTK"].MOMENTUM_PER_MB
     globalvars['e2e_epochs'] = 1 if cfg["CNTK"].FAST_MODE else cfg["CNTK"].E2E_MAX_EPOCHS
     globalvars['rpn_epochs'] = 1 if cfg["CNTK"].FAST_MODE else cfg["CNTK"].RPN_EPOCHS
@@ -138,6 +140,8 @@ def parse_arguments():
         globalvars['rpn_lr_factor'] = args['rpnLrFactor']
     if args['frcnLrFactor'] is not None:
         globalvars['frcn_lr_factor'] = args['frcnLrFactor']
+    if args['e2eLrFactor'] is not None:
+        globalvars['e2e_lr_factor'] = args['e2eLrFactor']
     if args['momentumPerMb'] is not None:
         globalvars['momentum_per_mb'] = args['momentumPerMb']
     if args['e2eEpochs'] is not None:
@@ -355,22 +359,24 @@ def train_faster_rcnn_e2e(debug_output=False):
         plot(loss, os.path.join(globalvars['output_path'], "graph_frcn_train_e2e." + cfg["CNTK"].GRAPH_TYPE))
 
     # Set learning parameters
-    lr_per_sample = cfg["CNTK"].E2E_LR_PER_SAMPLE
-    lr_schedule = learning_rate_schedule(lr_per_sample, unit=UnitType.sample)
+    e2e_lr_factor = globalvars['e2e_lr_factor']
+    e2e_lr_per_sample_scaled = [x * e2e_lr_factor for x in cfg["CNTK"].E2E_LR_PER_SAMPLE]
+    lr_schedule = learning_rate_schedule(e2e_lr_per_sample_scaled, unit=UnitType.sample)
     mm_schedule = momentum_schedule(cfg["CNTK"].MOMENTUM_PER_MB)
 
     print("Using base model:   {}".format(cfg["CNTK"].BASE_MODEL))
-    print("lr_per_sample:      {}".format(lr_per_sample))
+    print("lr_per_sample:      {}".format(e2e_lr_per_sample_scaled))
 
     train_model(image_input, roi_input, dims_input, loss, pred_error,
                 lr_schedule, mm_schedule, cfg["CNTK"].L2_REG_WEIGHT, globalvars['e2e_epochs'])
 
     return create_eval_model(loss, image_input, dims_input)
 
-def create_eval_model(model, image_input, dims_input):
+def create_eval_model(model, image_input, dims_input, rpn_model=None):
     print("creating eval model")
     conv_layers = clone_model(model, [feature_node_name], [last_conv_node_name], CloneMethod.freeze)
-    rpn = clone_model(model, [last_conv_node_name, "dims_input"], ["rpn_rois"], CloneMethod.freeze)
+    model_with_rpn = model if rpn_model is None else rpn_model
+    rpn = clone_model(model_with_rpn, [last_conv_node_name, "dims_input"], ["rpn_rois"], CloneMethod.freeze)
     roi_fc_layers = clone_model(model, [last_conv_node_name, "rpn_target_rois"], ["cls_score", "bbox_regr"], CloneMethod.freeze)
 
     conv_out = conv_layers(image_input)
@@ -578,7 +584,7 @@ def train_faster_rcnn_alternating(debug_output=False):
                     rpn_rois_input=rpn_rois_input, buffered_rpn_proposals=buffered_proposals_s2)
         buffered_proposals_s2 = None
 
-    return create_eval_model(stage2_frcn_network, image_input, dims_input)
+    return create_eval_model(stage2_frcn_network, image_input, dims_input, rpn_model=stage2_rpn_network)
 
 def eval_faster_rcnn_mAP(eval_model, img_map_file, roi_map_file):
     image_input = input_variable((num_channels, image_height, image_width), dynamic_axes=[Axis.default_batch_axis()], name=feature_node_name)
