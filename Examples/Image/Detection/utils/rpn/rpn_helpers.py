@@ -46,7 +46,8 @@ def create_rpn(conv_out, scaled_gt_boxes, im_info, add_loss_functions=True,
 
     # RPN network
     # init = 'normal', initValueScale = 0.01, initBias = 0.1
-    rpn_conv_3x3 = Convolution((3, 3), 256, activation=relu, pad=True, strides=1,
+    num_channels = cfg["CNTK"].RPN_NUM_CHANNELS
+    rpn_conv_3x3 = Convolution((3, 3), num_channels, activation=relu, pad=True, strides=1,
                                 init = normal(scale=0.01), init_bias=conv_bias_init)(conv_out)
     rpn_cls_score = Convolution((1, 1), 18, activation=None, name="rpn_cls_score",
                                 init = normal(scale=0.01), init_bias=conv_bias_init)(rpn_conv_3x3)  # 2(bg/fg)  * 9(anchors)

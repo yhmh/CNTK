@@ -27,6 +27,77 @@ __C = edict()
 #   from fast_rcnn_config import cfg
 cfg = __C
 
+#
+# CNTK parameters
+#
+
+__C.CNTK = edict()
+
+__C.CNTK.FAST_MODE = False
+__C.CNTK.MAKE_MODE = False
+__C.CNTK.TRAIN_E2E = False
+__C.CNTK.DEBUG_OUTPUT = False
+__C.CNTK.USE_MEAN_GRADIENT = False
+__C.CNTK.TRAIN_CONV_LAYERS = False
+
+__C.CNTK.CONV_BIAS_INIT = 0.0
+
+# Learning parameters
+__C.CNTK.L2_REG_WEIGHT = 0.0005
+__C.CNTK.MOMENTUM_PER_MB = 0.9
+
+# E2E config
+__C.CNTK.E2E_MAX_EPOCHS = 20
+__C.CNTK.E2E_LR_PER_SAMPLE = [0.00001] * 10 + [0.000001] * 10 + [0.0000001]
+
+# caffe rpn training: lr = [0.001] * 12 + [0.0001] * 4, momentum = 0.9, weight decay = 0.0005 (cf. stage1_rpn_solver60k80k.pt)
+__C.CNTK.RPN_EPOCHS = 4 # 16
+__C.CNTK.RPN_LR_PER_SAMPLE = [0.001] * 6 + [0.0001] * 4
+
+# caffe frcn training: lr = [0.001] * 6 + [0.0001] * 2, momentum = 0.9, weight decay = 0.0005 (cf. stage1_fast_rcnn_solver30k40k.pt)
+__C.CNTK.FRCN_EPOCHS = 10
+__C.CNTK.FRCN_LR_PER_SAMPLE = [0.000015] * 8 + [0.00001] * 8 + [0.000001]
+
+__C.CNTK.INPUT_ROIS_PER_IMAGE = 50
+__C.CNTK.IMAGE_WIDTH = 850
+__C.CNTK.IMAGE_HEIGHT = 850
+
+__C.CNTK.RESULTS_NMS_THRESHOLD = 0.3
+__C.CNTK.RESULTS_NMS_CONF_THRESHOLD = 0.0
+__C.CNTK.RESULTS_BGR_PLOT_THRESHOLD = 0.3
+
+__C.CNTK.GRAPH_TYPE = "png" # "png" or "pdf"
+__C.CNTK.VISUALIZE_RESULTS = False
+__C.CNTK.DRAW_NEGATIVE_ROIS = False
+__C.CNTK.DRAW_UNREGRESSED_ROIS = False
+
+__C.CNTK.FEATURE_STREAM_NAME = 'features'
+__C.CNTK.ROI_STREAM_NAME = 'roiAndLabel'
+__C.CNTK.DIMS_STREAM_NAME = 'dims'
+
+#
+# Base models
+#
+
+if __C.CNTK.BASE_MODEL == "AlexNet":
+    __C.CNTK.BASE_MODEL_FILE = "AlexNet.model"
+    __C.CNTK.FEATURE_NODE_NAME = "features"
+    __C.CNTK.LAST_CONV_NODE_NAME = "conv5.y" # == relu
+    __C.CNTK.START_TRAIN_CONV_NODE_NAME = "conv3.y"
+    __C.CNTK.POOL_NODE_NAME = "pool3"
+    __C.CNTK.LAST_HIDDEN_NODE_NAME = "h2_d"
+    __C.CNTK.RPN_NUM_CHANNELS = 256
+    __C.CNTK.ROI_DIM = 6
+
+if __C.CNTK.BASE_MODEL == "VGG16":
+    __C.CNTK.BASE_MODEL_FILE = "VGG16_ImageNet_Caffe.model" # "VGG16_ImageNet.cntkmodel"
+    __C.CNTK.FEATURE_NODE_NAME = "data"
+    __C.CNTK.LAST_CONV_NODE_NAME = "relu5_3"
+    __C.CNTK.START_TRAIN_CONV_NODE_NAME = "pool2"
+    __C.CNTK.POOL_NODE_NAME = "pool5"
+    __C.CNTK.LAST_HIDDEN_NODE_NAME = "drop7"
+    __C.CNTK.RPN_NUM_CHANNELS = 512
+    __C.CNTK.ROI_DIM = 7
 
 #
 # Training options
@@ -56,7 +127,7 @@ __C.TRAIN.FG_THRESH = 0.5
 # Overlap threshold for a ROI to be considered background (class = 0 if
 # overlap in [LO, HI))
 __C.TRAIN.BG_THRESH_HI = 0.5
-__C.TRAIN.BG_THRESH_LO = 0.1
+__C.TRAIN.BG_THRESH_LO = 0.0
 
 # Use horizontally-flipped images during training?
 __C.TRAIN.USE_FLIPPED = True
@@ -97,8 +168,6 @@ __C.TRAIN.PROPOSAL_METHOD = 'selective_search'
 # on zero-padding.
 __C.TRAIN.ASPECT_GROUPING = True
 
-# Use RPN to detect objects
-__C.TRAIN.HAS_RPN = False
 # IOU >= thresh: positive example
 __C.TRAIN.RPN_POSITIVE_OVERLAP = 0.7
 # IOU < thresh: negative example
@@ -158,9 +227,9 @@ __C.TEST.PROPOSAL_METHOD = 'selective_search'
 ## NMS threshold used on RPN proposals
 __C.TEST.RPN_NMS_THRESH = 0.7
 ## Number of top scoring boxes to keep before apply NMS to RPN proposals
-__C.TEST.RPN_PRE_NMS_TOP_N = 6000
+__C.TEST.RPN_PRE_NMS_TOP_N = 12000 # caffe: 6000
 ## Number of top scoring boxes to keep after applying NMS to RPN proposals
-__C.TEST.RPN_POST_NMS_TOP_N = 300
+__C.TEST.RPN_POST_NMS_TOP_N = 2000 # caffe: 300
 # Proposal height and width both need to be greater than RPN_MIN_SIZE (at orig image scale)
 __C.TEST.RPN_MIN_SIZE = 16
 

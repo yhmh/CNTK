@@ -64,7 +64,7 @@ __C.CNTK.RPN_LR_PER_SAMPLE = [0.001] * 6 + [0.0001] * 4
 #__C.CNTK.FRCN_LR_PER_SAMPLE = [0.001] * 6 + [0.00001] * 2
 # Current setting for CNTK AlexNet (92.5 mAP on Grocery):
 __C.CNTK.FRCN_EPOCHS = 10
-__C.CNTK.FRCN_LR_PER_SAMPLE = [0.000015] * 8 + [0.00001] * 8 + [0.000001]
+__C.CNTK.FRCN_LR_PER_SAMPLE = [0.00001] * 8 + [0.000005] * 8 + [0.000001]
 # Current setting for CNTK VGG16:
 #__C.CNTK.FRCN_EPOCHS = 20
 #__C.CNTK.FRCN_LR_PER_SAMPLE = [0.0000005] * 8 + [0.00000005]
@@ -128,6 +128,7 @@ if __C.CNTK.BASE_MODEL == "AlexNet":
     __C.CNTK.START_TRAIN_CONV_NODE_NAME = "conv3.y"
     __C.CNTK.POOL_NODE_NAME = "pool3"
     __C.CNTK.LAST_HIDDEN_NODE_NAME = "h2_d"
+    __C.CNTK.RPN_NUM_CHANNELS = 256
     __C.CNTK.ROI_DIM = 6
 
 if __C.CNTK.BASE_MODEL == "VGG16":
@@ -137,6 +138,7 @@ if __C.CNTK.BASE_MODEL == "VGG16":
     __C.CNTK.START_TRAIN_CONV_NODE_NAME = "pool2"
     __C.CNTK.POOL_NODE_NAME = "pool5"
     __C.CNTK.LAST_HIDDEN_NODE_NAME = "drop7"
+    __C.CNTK.RPN_NUM_CHANNELS = 512
     __C.CNTK.ROI_DIM = 7
 
 #
