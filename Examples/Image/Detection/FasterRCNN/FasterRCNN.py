@@ -112,9 +112,9 @@ def parse_arguments():
                         action='store_true')
     parser.add_argument('-device', '--device', type=int, help="Force to run the script on a specified device",
                         required=False, default=None)
-    parser.add_argument('-rpnLrFactor', '--rpnLrFactor', type=float, help="Scale factor for rpn lr schedule", required=False, default=1.0)
-    parser.add_argument('-frcnLrFactor', '--frcnLrFactor', type=float, help="Scale factor for frcn lr schedule", required=False, default=1.0)
-    parser.add_argument('-e2eLrFactor', '--e2eLrFactor', type=float, help="Scale factor for e2e lr schedule", required=False, default=1.0)
+    parser.add_argument('-rpnLrFactor', '--rpnLrFactor', type=float, help="Scale factor for rpn lr schedule", required=False)
+    parser.add_argument('-frcnLrFactor', '--frcnLrFactor', type=float, help="Scale factor for frcn lr schedule", required=False)
+    parser.add_argument('-e2eLrFactor', '--e2eLrFactor', type=float, help="Scale factor for e2e lr schedule", required=False)
     parser.add_argument('-momentumPerMb', '--momentumPerMb', type=float, help="momentum per minibatch", required=False)
     parser.add_argument('-e2eEpochs', '--e2eEpochs', type=int, help="number of epochs for e2e training", required=False)
     parser.add_argument('-rpnEpochs', '--rpnEpochs', type=int, help="number of epochs for rpn training", required=False)
@@ -126,9 +126,9 @@ def parse_arguments():
     args = vars(parser.parse_args())
 
     # set and overwrite learning parameters
-    globalvars['rpn_lr_factor'] = 1.0
-    globalvars['frcn_lr_factor'] = 1.0
-    globalvars['e2e_lr_factor'] = 1.0
+    globalvars['rpn_lr_factor'] = cfg["CNTK"].RPN_LR_FACTOR
+    globalvars['frcn_lr_factor'] = cfg["CNTK"].FRCN_LR_FACTOR
+    globalvars['e2e_lr_factor'] = cfg["CNTK"].E2E_LR_FACTOR
     globalvars['momentum_per_mb'] = cfg["CNTK"].MOMENTUM_PER_MB
     globalvars['e2e_epochs'] = 1 if cfg["CNTK"].FAST_MODE else cfg["CNTK"].E2E_MAX_EPOCHS
     globalvars['rpn_epochs'] = 1 if cfg["CNTK"].FAST_MODE else cfg["CNTK"].RPN_EPOCHS
