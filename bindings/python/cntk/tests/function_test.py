@@ -87,6 +87,12 @@ def test_clone_freeze():
     for cc in c.constants:
         cc.value = np.random.randn(*cc.value.shape).astype('f')
 
+    # attempt to update z_clone
+    with pytest.raises(RuntimeError) as excinfo:
+        for zc in z_clone.constants:
+            zc.value = np.random.randn(*zc.value.shape).astype('f')
+    assert 'readonly' in str(excinfo.value)
+
     # attempt to update c_clone
     with pytest.raises(RuntimeError) as excinfo:
         for cc in c_clone.constants:
